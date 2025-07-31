@@ -4,10 +4,12 @@
 
 typedef struct Player {
     Vector2 pos;
-    Vector2 dir;
+    Vector2 velocity;
+    Vector2 direction;
+    float acceleration;
     float width;
     float length;
-    float moveSpeed;
+    float breaking;
 } Player;
 
 
@@ -24,62 +26,53 @@ typedef struct Player {
 
 
 
+Vector2 rescale(Vector2 point, const Rectangle MAPSIZE, const Rectangle TRACK) {
+    Vector2 result;
 
+    float scaleX = MAPSIZE.width / TRACK.width;
+    float scaleY = MAPSIZE.height / TRACK.height;
 
-Vector2 rescale(Vector2 point, const Rectangle MAPSIZE, const Rectangle BORDER) {
+    result.x = MAPSIZE.x + (point.x - TRACK.x) * scaleX;
+    result.y = MAPSIZE.y + (point.y - TRACK.y) * scaleY;
 
-    // 1. Subtract back room origin to get local coordinates
-    point = Vector2Subtract(point, (Vector2){BORDER.x, BORDER.y + BORDER.height});
-    
-    // 2. Compute scaling factors
-    float scaleX = MAPSIZE.width / BORDER.width;
-    float scaleY = MAPSIZE.height / BORDER.height;
-
-    // 3. Apply scaling
-    point.x *= scaleX;
-    point.y *= scaleY;
-
-    // 4. Flip Y if needed (optional depending on your visual setup)
-    point.y *= -1;
-
-    // 5. Translate to front room origin
-    point = Vector2Add(point, (Vector2){MAPSIZE.x, MAPSIZE.y});
-
-    
-
-    return point;
+    return result;
 }
 
 
 
 
+void attemptedMovement(Player *player, Vector2 *bufferPos) {
 
+    Vector2 resultantAcceleration = {0, 0};
+    float degrees = 0.0f;
 
+    //Rotation
+    if(IsKeyDown(KEY_A)) degrees -= PI/8;
+    if(IsKeyDown(KEY_D)) degrees += PI/8;
 
-Vector2 attemptedMovement(Player* player, Vector2* bufferPos) {
-    Vector2 move = {0, 0};
-    float angle = 0;
-
-    if (IsKeyDown(KEY_W)) move.y++;
-    if (IsKeyDown(KEY_S)) move.y--;
-    if (IsKeyDown(KEY_A)) move.x--;
-    if (IsKeyDown(KEY_D)) move.x++;
-    if (IsKeyDown(KEY_O)) angle += PI/2;
-    if (IsKeyDown(KEY_P)) angle -= PI/2;
-
-    if (move.x != 0 || move.y != 0) {
-        move = Vector2Normalize(move);
-        *bufferPos = Vector2Add(player->pos, Vector2Scale(move, player->moveSpeed));
+    //Acceleration
+    if(IsKeyDown(KEY_W)) {
+        Vector2 accelerationDirection = Vector2Rotate(player->direction, degrees);
+        resultantAcceleration = Vector2Add(resultantAcceleration, Vector2Scale(accelerationDirection, player->acceleration));
     }
-
-    return Vector2Rotate(move, angle);
+    //Breaking
+    else if(IsKeyDown(KEY_S)) {
+        resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->velocity, player->breaking));
+    }
+    //Resistanve Force
+    resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->velocity, 0.125));
+    player->velocity = Vector2Add(player->velocity, resultantAcceleration);
+    if(player->velocity.x != 0 || player->velocity.y != 0){
+        player->direction =  Vector2Normalize(player->velocity);
+        
+    }
+    *bufferPos = Vector2Add(*bufferPos, player->velocity);
 }
 
-
-
-void movePlayer(Player *player, const Rectangle BORDER) {
+void movePlayer(Player *player, const Rectangle TRACK) {
     Vector2 bufferPos = player->pos;
-    Vector2 bufferDir = attemptedMovement(player, &bufferPos);
+    attemptedMovement(player, &bufferPos);
+
 
     Rectangle futurePlayer = {
         bufferPos.x,
@@ -89,18 +82,14 @@ void movePlayer(Player *player, const Rectangle BORDER) {
     };
 
     bool inBounds =
-        bufferPos.x >= BORDER.x &&
-        bufferPos.x + player->width <= BORDER.x + BORDER.width &&
-        bufferPos.y >= BORDER.y &&
-        bufferPos.y + player->length <= BORDER.y + BORDER.height;
+        bufferPos.x >= TRACK.x &&
+        bufferPos.x + player->width <= TRACK.x + TRACK.width &&
+        bufferPos.y >= TRACK.y &&
+        bufferPos.y + player->length <= TRACK.y + TRACK.height;
 
-    if (inBounds) {
-        player->pos = bufferPos;
-    }
-    if (bufferDir.x != 0 || bufferDir.y != 0) {
-        player->dir.y = -bufferDir.y;
-        player->dir.x = bufferDir.x;
-    }
+    if (inBounds) player->pos = bufferPos;
+
+
 }
 
 
@@ -129,22 +118,24 @@ void drawWalls3D(const Rectangle WALLS) {
 }
 
 
+void drawMapPlayer(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
+    // Convert top-left player position to center position in world space
+    Vector2 playerCenter = {
+        player.pos.x + player.width / 2,
+        player.pos.y + player.length / 2
+    };
 
+    // Rescale the center position from world space (TRACK) to minimap (MAPSIZE)
+    Vector2 minimapPos = rescale(playerCenter, MAPSIZE, TRACK);
 
-void drawMapPlayer(Player player, const Rectangle MAPSIZE, const Rectangle BORDER) {
-    Vector2 frontPlayerPos = rescale(player.pos, MAPSIZE, BORDER);
+    // Draw the player as a small circle
+    DrawCircleV(minimapPos, 4, RED);  // Adjust radius as needed
 
-    // Compute scaling factors
-    float scaleX = MAPSIZE.width / BORDER.width;
-    float scaleY = MAPSIZE.height / BORDER.height;
-    // Centering
-    frontPlayerPos.x += player.width * scaleX / 2;
-    frontPlayerPos.y -= player.length * scaleY / 2;
-
-    DrawCircleV(frontPlayerPos, player.length * scaleY * 0.25, RED);
-    DrawLineEx(frontPlayerPos, Vector2Add(frontPlayerPos, Vector2Scale(player.dir, 4)), 4, RED);
+    // Draw the direction vector (e.g., facing forward)
+    Vector2 directionEnd = Vector2Add(minimapPos, Vector2Scale(player.direction, 10));
+    DrawLineEx(minimapPos, directionEnd, 2, RED);
+    
 }
-
 
 
 void drawMap(const Rectangle ROOM) {
@@ -161,8 +152,8 @@ void drawMap(const Rectangle ROOM) {
 }
 
 
-void draw(Player player, const Rectangle MAPSIZE, const Rectangle BORDER) {
-    drawMapPlayer(player, MAPSIZE, BORDER);
+void draw(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
+    drawMapPlayer(player, MAPSIZE, TRACK);
     drawMap(MAPSIZE);
 }
 
@@ -170,30 +161,32 @@ void draw(Player player, const Rectangle MAPSIZE, const Rectangle BORDER) {
 
 
 
-void gameloop() {
+void gameloop(const int FRAMERATE) {
 
     Player player = {
-        .pos = {0, 0},
-        .dir = {0, -1},
+        .pos = {800, 800},
+        .direction = {0, -1},
         .width = 4.0f,
         .length = 4.0f,
-        .moveSpeed = 0.5f
+        .acceleration = 13.4/FRAMERATE,
+        .breaking = 0.5,
+        .velocity = {0, 0}
     };
 
 
     
-    const Rectangle MAPSIZE = {10, 10, 200, 200};
-    const Rectangle BORDER = {-50, -50, 100, 100};
+    const Rectangle MAPSIZE = {10, 10, 400, 400};
+    const Rectangle TRACK = {0, 0, 1750, 1750};
     const Rectangle WALLS = {-200, -200, 400, 400};
 
-
+/*
     Camera3D camera = {0};
     camera.position = (Vector3){0, 2 ,0};
-    camera.target = Vector3Add(camera.position, (Vector3){player.dir.x, 0.0f, player.dir.y});
+    camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0.0f, player.direction.y});
     camera.up = (Vector3){0.0f, 1.0f, 0.0f}; // Y is up
     camera.fovy = 45.0f;                                // Field of view
     camera.projection = CAMERA_PERSPECTIVE;  
-
+*/
 
     while (!WindowShouldClose()) {
 
@@ -204,16 +197,16 @@ void gameloop() {
         ToggleFullscreen();
         }
 
-        Vector2 scaled3d = rescale(player.pos, WALLS, BORDER);
+        Vector2 scaled3d = rescale(player.pos, MAPSIZE, TRACK);
 
-        BeginMode3D(camera);  // Begin 3D mode with camera
+        /*BeginMode3D(camera);  // Begin 3D mode with camera
             camera.position = (Vector3){scaled3d.x, 2, scaled3d.y};
-            camera.target = Vector3Add(camera.position, (Vector3){player.dir.x, 0, player.dir.y});
+            camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0, player.direction.y});
             drawWalls3D(WALLS);
-        EndMode3D();
+        EndMode3D();*/
 
-        movePlayer(&player, BORDER);
-        draw(player, MAPSIZE, BORDER);
+        movePlayer(&player, TRACK);
+        draw(player, MAPSIZE, TRACK);
 
         EndDrawing();
     }
@@ -221,18 +214,19 @@ void gameloop() {
 
 
 int main() {
-    const int screenWidth = 1400;
-    const int screenHeight = 800;
+    const int SCREENWIDTH = 1400;
+    const int SCREENHIEGHT = 800;
+    const int FRAMERATE = 60;
 
-    InitWindow(screenWidth, screenHeight, "Racer");
+    InitWindow(SCREENWIDTH, SCREENHIEGHT, "Racer");
 
-    SetTargetFPS(60); // Limit to 60 frames per second
+    SetTargetFPS(FRAMERATE); // Limit to 60 frames per second
     SetExitKey(KEY_NULL);
 
 
 
 
-    gameloop();
+    gameloop(FRAMERATE);
 
     CloseWindow(); // Clean up
     return 0;
