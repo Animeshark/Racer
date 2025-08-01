@@ -3,9 +3,9 @@
 #include "raymath.h"
 
 typedef struct Player {
-    Vector2 pos;
-    Vector2 velocity;
-    Vector2 direction;
+    Vector2 pos; 
+    Vector2 velocity; 
+    Vector2 direction; // the direction the front wheels are facing
     float acceleration;
     float width;
     float length;
@@ -158,6 +158,37 @@ void draw(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
 }
 
 
+// Tbh completely Ai idk how this function works
+void UpdateCameraLookOnly(Camera3D *camera, float sensitivity) {
+    Vector2 mouseDelta = GetMouseDelta();
+
+    float yaw = -mouseDelta.x * sensitivity;
+    float pitch = -mouseDelta.y * sensitivity;
+
+    // Clamp vertical look (pitch) to avoid flipping
+    static float totalPitch = 0.0f;
+    totalPitch += pitch;
+    if (totalPitch > 89.0f) { pitch -= totalPitch - 89.0f; totalPitch = 89.0f; }
+    if (totalPitch < -89.0f) { pitch -= totalPitch + 89.0f; totalPitch = -89.0f; }
+
+    // Get current forward vector
+    Vector3 forward = Vector3Subtract(camera->target, camera->position);
+
+    // Apply yaw rotation around the up axis
+    Matrix yawMat = MatrixRotate(camera->up, DEG2RAD * yaw);
+    forward = Vector3Transform(forward, yawMat);
+
+    // Calculate right vector and pitch
+    Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera->up));
+    Matrix pitchMat = MatrixRotate(right, DEG2RAD * pitch);
+    forward = Vector3Transform(forward, pitchMat);
+
+    // Update target
+    camera->target = Vector3Add(camera->position, forward);
+}
+
+
+
 
 
 
@@ -175,18 +206,19 @@ void gameloop(const int FRAMERATE) {
 
 
     
-    const Rectangle MAPSIZE = {10, 10, 400, 400};
+    const Rectangle MAPSIZE = {10, 10, 200, 200};
     const Rectangle TRACK = {0, 0, 1750, 1750};
-    const Rectangle WALLS = {-200, -200, 400, 400};
 
-/*
+    float sensitivity = 0.2;
+
+
     Camera3D camera = {0};
     camera.position = (Vector3){0, 2 ,0};
     camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0.0f, player.direction.y});
     camera.up = (Vector3){0.0f, 1.0f, 0.0f}; // Y is up
     camera.fovy = 45.0f;                                // Field of view
     camera.projection = CAMERA_PERSPECTIVE;  
-*/
+
 
     while (!WindowShouldClose()) {
 
@@ -197,13 +229,11 @@ void gameloop(const int FRAMERATE) {
         ToggleFullscreen();
         }
 
-        Vector2 scaled3d = rescale(player.pos, MAPSIZE, TRACK);
-
-        /*BeginMode3D(camera);  // Begin 3D mode with camera
-            camera.position = (Vector3){scaled3d.x, 2, scaled3d.y};
-            camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0, player.direction.y});
-            drawWalls3D(WALLS);
-        EndMode3D();*/
+        BeginMode3D(camera);  // Begin 3D mode with camera
+            camera.position = (Vector3){player.pos.x, 2, player.pos.y};
+            UpdateCameraLookOnly(&camera, sensitivity);
+            drawWalls3D(TRACK);
+        EndMode3D();
 
         movePlayer(&player, TRACK);
         draw(player, MAPSIZE, TRACK);
