@@ -57,7 +57,7 @@ void attemptedMovement(Player *player, Vector2 *bufferPos) {
     }
     //Breaking
     else if(IsKeyDown(KEY_S)) {
-        resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->velocity, player->breaking));
+        resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->direction, player->breaking));
     }
     //Resistanve Force
     resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->velocity, 0.125));
@@ -68,6 +68,7 @@ void attemptedMovement(Player *player, Vector2 *bufferPos) {
     }
     *bufferPos = Vector2Add(*bufferPos, player->velocity);
 }
+
 
 void movePlayer(Player *player, const Rectangle TRACK) {
     Vector2 bufferPos = player->pos;
@@ -158,8 +159,10 @@ void draw(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
 }
 
 
+
+
 // Tbh completely Ai idk how this function works
-void UpdateCameraLookOnly(Camera3D *camera, float sensitivity) {
+void updateCameraLookOnly(Camera3D *camera, float sensitivity) {
     Vector2 mouseDelta = GetMouseDelta();
 
     float yaw = -mouseDelta.x * sensitivity;
@@ -187,7 +190,9 @@ void UpdateCameraLookOnly(Camera3D *camera, float sensitivity) {
     camera->target = Vector3Add(camera->position, forward);
 }
 
-
+void drawPauseMenu() {
+    
+}
 
 
 
@@ -209,34 +214,65 @@ void gameloop(const int FRAMERATE) {
     const Rectangle MAPSIZE = {10, 10, 200, 200};
     const Rectangle TRACK = {0, 0, 1750, 1750};
 
+    
+    unsigned short gameState = 0;
+    /*
+    0 = Start menu
+    1 = Pause menu
+    2 = Game play
+    3 = loss screen
+    */
+    unsigned short previousState = 0;
+
     float sensitivity = 0.2;
-
-
     Camera3D camera = {0};
     camera.position = (Vector3){0, 2 ,0};
     camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0.0f, player.direction.y});
     camera.up = (Vector3){0.0f, 1.0f, 0.0f}; // Y is up
     camera.fovy = 45.0f;                                // Field of view
     camera.projection = CAMERA_PERSPECTIVE;  
+    
 
 
     while (!WindowShouldClose()) {
 
         BeginDrawing();
         ClearBackground(GRAY);
+        
 
-        if (IsKeyPressed(KEY_F11)) {
-        ToggleFullscreen();
+        if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (gameState == 1) gameState = 2;
+            else if (gameState == 2) gameState = 1;
         }
 
-        BeginMode3D(camera);  // Begin 3D mode with camera
-            camera.position = (Vector3){player.pos.x, 2, player.pos.y};
-            UpdateCameraLookOnly(&camera, sensitivity);
-            drawWalls3D(TRACK);
-        EndMode3D();
 
-        movePlayer(&player, TRACK);
-        draw(player, MAPSIZE, TRACK);
+        switch (gameState) {
+        case 0:
+            /* start menu */
+
+        case 1:
+            // pause
+
+        case 2:
+            BeginMode3D(camera);  // Begin 3D mode with camera
+                camera.position = (Vector3){player.pos.x, 2, player.pos.y};
+                updateCameraLookOnly(&camera, sensitivity);
+                drawWalls3D(TRACK);
+            EndMode3D();
+
+            movePlayer(&player, TRACK);
+            draw(player, MAPSIZE, TRACK);
+            break;
+
+        case 3:
+            // loss
+        
+        default:
+            break;
+        }
+        
+
 
         EndDrawing();
     }
