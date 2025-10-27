@@ -2,6 +2,15 @@
 #include "raylib.h"
 #include "raymath.h"
 
+typedef struct Inputs {
+    int up[2];
+    int left[2];
+    int right[2];
+    int down[2];
+    int enter[2];
+} Inputs;
+
+
 typedef struct Player {
     Vector2 pos; 
     Vector2 velocity; 
@@ -12,6 +21,53 @@ typedef struct Player {
     float breaking;
 } Player;
 
+
+
+
+
+
+
+
+
+
+// easier to do this than write the if statement every time
+// very easy to just sub these into the if statement if I thinks its better
+
+bool getUp(Inputs hotkeys) {
+     return IsKeyPressed(hotkeys.up[0]) || IsKeyPressed(hotkeys.up[1]);
+}
+
+bool getDown(Inputs hotkeys) {
+    return IsKeyPressed(hotkeys.down[0]) || IsKeyPressed(hotkeys.down[1]);
+}
+
+bool getLeft(Inputs hotkeys) {
+    return IsKeyPressed(hotkeys.left[0]) || IsKeyPressed(hotkeys.left[1]);
+}
+
+bool getRight(Inputs hotkeys) {
+    return IsKeyPressed(hotkeys.right[0]) || IsKeyPressed(hotkeys.right[1]);
+}
+
+// dif cause enter key must be pressed
+
+bool getEnter(Inputs hotkeys) {
+    return IsKeyPressed(hotkeys.enter[0]) || IsKeyPressed(hotkeys.enter[1]);
+}
+
+
+bool checkWindowSize(int *screenWidth, int *screenHeight) {
+    // Returns true if window size changes
+    if (IsKeyPressed(KEY_F11)) {
+        ToggleFullscreen();
+    }
+    if (*screenWidth != GetScreenWidth() || *screenHeight != GetScreenHeight()) {
+        *screenWidth = GetScreenWidth();
+        *screenHeight = GetScreenHeight();
+        return true;
+    }
+    return false;
+}
 
 
 
@@ -197,6 +253,9 @@ void drawPauseMenu() {
 
 
 
+
+
+
 void gameloop(const int FRAMERATE) {
 
     Player player = {
@@ -214,16 +273,6 @@ void gameloop(const int FRAMERATE) {
     const Rectangle MAPSIZE = {10, 10, 200, 200};
     const Rectangle TRACK = {0, 0, 1750, 1750};
 
-    
-    unsigned short gameState = 0;
-    /*
-    0 = Start menu
-    1 = Pause menu
-    2 = Game play
-    3 = loss screen
-    */
-    unsigned short previousState = 0;
-
     float sensitivity = 0.2;
     Camera3D camera = {0};
     camera.position = (Vector3){0, 2 ,0};
@@ -234,65 +283,218 @@ void gameloop(const int FRAMERATE) {
     
 
 
-    while (!WindowShouldClose()) {
+    while (gameState == 2) {
+
+        movePlayer(&player, TRACK);
+        
+        if (WindowShouldClose()) gameState = -1; // will set gameState to bit integer, used for exit
+        if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+        if (IsKeyPressed(KEY_ESCAPE)) gameState = 1;
+
 
         BeginDrawing();
         ClearBackground(GRAY);
-        
-
-        if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
-        if (IsKeyPressed(KEY_ESCAPE)) {
-            if (gameState == 1) gameState = 2;
-            else if (gameState == 2) gameState = 1;
-        }
-
-
-        switch (gameState) {
-        case 0:
-            /* start menu */
-
-        case 1:
-            // pause
-
-        case 2:
-            BeginMode3D(camera);  // Begin 3D mode with camera
-                camera.position = (Vector3){player.pos.x, 2, player.pos.y};
-                updateCameraLookOnly(&camera, sensitivity);
-                drawWalls3D(TRACK);
-            EndMode3D();
-
-            movePlayer(&player, TRACK);
-            draw(player, MAPSIZE, TRACK);
-            break;
-
-        case 3:
-            // loss
-        
-        default:
-            break;
-        }
-        
-
-
+    
+        BeginMode3D(camera);  // Begin 3D mode with camera
+            camera.position = (Vector3){player.pos.x, 2, player.pos.y};
+            updateCameraLookOnly(&camera, sensitivity);
+            drawWalls3D(TRACK);
+        EndMode3D();
+        draw(player, MAPSIZE, TRACK);
         EndDrawing();
     }
 }
 
 
+
+void drawStartMenu() {
+
+}
+
+void StartMenu(const int FRAMERATE, Inputs hotkeys, unsigned short *gameState, int screenWidth, int screenHeight) {
+    //Initialising textures
+
+    const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
+    const Texture2D title = LoadTexture("Assets/Menu/title.png");
+    const Texture2D titleShadow = LoadTexture("Assets/Menu/title shadow.png");
+    //Buttons
+    const Texture2D exit = LoadTexture("Assets/Menu/buttons/exit.png");
+    const Texture2D settings = LoadTexture("Assets/Menu/buttons/settings.png");
+    const Texture2D start = LoadTexture("Assets/Menu/buttons/start.png");
+    //Pointer is so you know what button your pressing.
+    const Texture2D pointer = LoadTexture("Assets/Menu/pointer.png");
+    
+
+    // Scale Factors
+
+    float titleSF = 2.0f;
+
+    // Positions
+
+    Vector2 mid = {screenWidth/2, screenHeight/2};
+
+    Vector2 titlePos = {mid.x - title.width * titleSF / 2.0f, screenHeight / 4.0f - title.height * titleSF / 2.0f};
+    Vector2 titleShadowPos = {titlePos.x + 5, titlePos.y + 5}; // Offseting shadow
+    // Buttons
+    Vector2 startPos = {mid.x - start.width / 2.0f, mid.y - start.height / 2.0f};
+    Vector2 settingsPos = {mid.x - settings.width / 2.0f, screenHeight * 3.0f / 4.0f - settings.height / 2.0f};
+    Vector2 exitPos = {10, screenHeight - exit.height - 10}; // keep exit at bottom left
+    
+    // Pointer 
+    Vector2 pointerPos = {startPos.x - pointer.width - 10, startPos.y + start.height / 2.0f - pointer.height / 2.0f}; // starts next to start button
+
+
+
+
+    unsigned short selectedButton = 0;
+    /*
+        start = 0 
+        settings = 1
+        exit = 2
+    */
+
+
+
+
+    while(*gameState == 0){
+
+        if (WindowShouldClose()) *gameState = -1; // will set gameState to bit integer limit, used for exit
+        if (checkWindowSize(&screenWidth, &screenHeight)) {
+            mid = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
+
+            // Center title
+            titlePos = (Vector2){mid.x - title.width * titleSF / 2.0f, screenHeight / 4.0f - title.height * titleSF / 2.0f};
+            titleShadowPos = (Vector2){titlePos.x + 10, titlePos.y + 10};
+
+            // Buttons
+            startPos = (Vector2){mid.x - start.width / 2.0f, mid.y - start.height / 2.0f};
+            settingsPos = (Vector2){mid.x - settings.width / 2.0f, screenHeight * 3.0f / 4.0f - settings.height / 2.0f};
+            exitPos = (Vector2){10, screenHeight - exit.height - 10}; // keep exit at bottom left
+        }
+        
+        // Pointer next to the selected button
+        switch (selectedButton) {
+            case 0:
+                pointerPos = (Vector2){startPos.x - pointer.width - 10, startPos.y + start.height / 2.0f - pointer.height / 2.0f};
+                break;
+            case 1:
+                pointerPos = (Vector2){settingsPos.x - pointer.width - 10, settingsPos.y + settings.height / 2.0f - pointer.height / 2.0f};
+                break;
+            case 2:
+                pointerPos = (Vector2){exitPos.x + exit.width + 10  , exitPos.y + exit.height / 2.0f - pointer.height / 2.0f};
+                break;
+            default:
+                break;
+        }
+
+        // Inputhandling
+
+        if (getDown(hotkeys) && selectedButton != 2) selectedButton++;
+        if (getUp(hotkeys) && selectedButton != 0) selectedButton--;
+
+        if (getEnter(hotkeys)) {
+            switch (selectedButton) {
+                case 0: *gameState = 2; break; // Start game
+                case 1: *gameState = 1; break; // Settings
+                case 2: *gameState = -1; break; // Exit
+                default: break;
+            }
+        }
+
+    BeginDrawing();
+        ClearBackground(WHITE);
+
+        // Background
+        DrawTexturePro(
+            bg, 
+            (Rectangle){0, 0, bg.width, bg.height}, 
+            (Rectangle){0, 0, screenWidth, screenHeight}, 
+            (Vector2){0, 0}, 0, WHITE);
+
+        // Draw title shadow
+        DrawTexturePro(
+            titleShadow,
+            (Rectangle){0, 0, titleShadow.width, titleShadow.height},
+            (Rectangle){titleShadowPos.x, titleShadowPos.y, titleShadow.width * titleSF, titleShadow.height * titleSF},
+            (Vector2){0, 0}, 0, WHITE);
+        // Draw title
+        DrawTexturePro(
+            title,
+            (Rectangle){0, 0, title.width, title.height},
+            (Rectangle){titlePos.x, titlePos.y, title.width * titleSF, title.height * titleSF},
+            (Vector2){0, 0}, 0, WHITE);
+
+
+        DrawTexture(start, startPos.x, startPos.y, WHITE);
+        DrawTexture(settings, settingsPos.x, settingsPos.y, WHITE);
+        DrawTexture(exit, exitPos.x, exitPos.y, WHITE);
+        DrawTexture(pointer, pointerPos.x, pointerPos.y, WHITE);
+    EndDrawing();
+    }
+
+    // Cleanup
+    UnloadTexture(bg);
+    UnloadTexture(title);
+    UnloadTexture(exit);
+    UnloadTexture(settings);
+    UnloadTexture(start);
+    UnloadTexture(pointer);
+}
+
+
+
+
+
+
+
 int main() {
-    const int SCREENWIDTH = 1400;
-    const int SCREENHIEGHT = 800;
+    int screenWidth = 1400;
+    int screenHeight = 800;
     const int FRAMERATE = 60;
 
-    InitWindow(SCREENWIDTH, SCREENHIEGHT, "Racer");
+    InitWindow(screenWidth , screenHeight, "Racer");
+    SetWindowState(FLAG_WINDOW_RESIZABLE); // Draging the corner will resize the window
 
     SetTargetFPS(FRAMERATE); // Limit to 60 frames per second
-    SetExitKey(KEY_NULL);
+    SetExitKey(KEY_NULL); // Stops pressing esc closing the window
+
+    //Setting default input values
+    Inputs hotkeys = {
+        .up = {KEY_W, KEY_UP},
+        .down = {KEY_S, KEY_DOWN},
+        .left = {KEY_A, KEY_LEFT},
+        .right = {KEY_D, KEY_RIGHT},
+        .enter = {KEY_ENTER, KEY_SPACE}
+    };
+
+    // GameState handling
+
+    unsigned short gameState = 0;
+    while (gameState >= 0 && gameState <= 3) {
+        switch (gameState) {
+            case 0:
+                StartMenu(FRAMERATE, hotkeys, &gameState, screenWidth, screenHeight);
+                break;
+                
+            case 1:
+                // settings
+
+            case 2:
+                gameloop(FRAMERATE);
+                break;
+
+            case 3:
+                // loss
+            
+            default:
+                break;
+        }
+    }
 
 
 
 
-    gameloop(FRAMERATE);
+
 
     CloseWindow(); // Clean up
     return 0;
