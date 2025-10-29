@@ -69,6 +69,10 @@ bool checkWindowSize(int *screenWidth, int *screenHeight) {
     return false;
 }
 
+Vector2 centreText(Vector2 aimedPos, const Font *FONT, const char *text, float size, float spacing) {
+    Vector2 dimentions = MeasureTextEx(*FONT, text, size, spacing);
+    return Vector2Subtract(aimedPos, Vector2Scale(dimentions, 0.5f));
+}
 
 
 
@@ -256,7 +260,7 @@ void drawPauseMenu() {
 
 
 
-void gameloop(const int FRAMERATE) {
+void gameloop(const int FRAMERATE, unsigned short *gameState) {
 
     Player player = {
         .pos = {800, 800},
@@ -283,13 +287,13 @@ void gameloop(const int FRAMERATE) {
     
 
 
-    while (gameState == 2) {
+    while (*gameState == 2) {
 
         movePlayer(&player, TRACK);
         
-        if (WindowShouldClose()) gameState = -1; // will set gameState to bit integer, used for exit
+        if (WindowShouldClose()) *gameState = -1; // will set gameState to bit integer, used for exit
         if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
-        if (IsKeyPressed(KEY_ESCAPE)) gameState = 1;
+        if (IsKeyPressed(KEY_ESCAPE)) *gameState = 1;
 
 
         BeginDrawing();
@@ -307,46 +311,53 @@ void gameloop(const int FRAMERATE) {
 
 
 
-void drawStartMenu() {
-
-}
-
-void StartMenu(const int FRAMERATE, Inputs hotkeys, unsigned short *gameState, int screenWidth, int screenHeight) {
-    //Initialising textures
-
-    const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
-    const Texture2D title = LoadTexture("Assets/Menu/title.png");
-    const Texture2D titleShadow = LoadTexture("Assets/Menu/title shadow.png");
-    //Buttons
-    const Texture2D exit = LoadTexture("Assets/Menu/buttons/exit.png");
-    const Texture2D settings = LoadTexture("Assets/Menu/buttons/settings.png");
-    const Texture2D start = LoadTexture("Assets/Menu/buttons/start.png");
-    //Pointer is so you know what button your pressing.
-    const Texture2D pointer = LoadTexture("Assets/Menu/pointer.png");
+void startMenu(const int FRAMERATE, unsigned short *gameState, int screenWidth, int screenHeight, Inputs hotkeys) {
     
+    //Font
+    const Font DOOM = LoadFontEx("Assets/font/Amazdoomleft-epw3.ttf", 128, 0, 0);
+    SetTextureFilter(DOOM.texture, TEXTURE_FILTER_POINT);
 
-    // Scale Factors
+    //Initialising textures
+    const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
+    const Texture2D pointer = LoadTexture("Assets/Menu/pointer.png");
 
-    float titleSF = 2.0f;
+    //text
+    const char titleText[] = "SUPER RACEY RACER";
+    const char startText[] = "Start";
+    const char exitText[] = "Exit";
+    const char settingsText[] = "Settings";
+
+    /* Sizes
+    They are floats although will only hold integer values. 
+    Scaling with integers leads to smooth edges.
+    Floats are used to avoid realtime casting in the raylib text func*/
+
+    float adjustmentFactor = roundf((float)screenHeight / 800.0f); //scale with screen size. 1 at base size
+
+    float buttonSize = 36.0f * adjustmentFactor * 2; //Multiplying 36 because I want the resolution to be a clean multi
+    float titleSize = 2.0f * buttonSize;
+    float spacing = buttonSize / 18.0f;
+
+    // Exit needs dimentions because he is reletive to a side
+    Vector2 exitDimentions = MeasureTextEx(DOOM, exitText, buttonSize, spacing);
 
     // Positions
-
     Vector2 mid = {screenWidth/2, screenHeight/2};
 
-    Vector2 titlePos = {mid.x - title.width * titleSF / 2.0f, screenHeight / 4.0f - title.height * titleSF / 2.0f};
+    Vector2 titlePos = centreText((Vector2){mid.x, mid.y/4}, &DOOM, titleText, titleSize, spacing);
     Vector2 titleShadowPos = {titlePos.x + 5, titlePos.y + 5}; // Offseting shadow
     // Buttons
-    Vector2 startPos = {mid.x - start.width / 2.0f, mid.y - start.height / 2.0f};
-    Vector2 settingsPos = {mid.x - settings.width / 2.0f, screenHeight * 3.0f / 4.0f - settings.height / 2.0f};
-    Vector2 exitPos = {10, screenHeight - exit.height - 10}; // keep exit at bottom left
+    Vector2 startPos = centreText((Vector2){mid.x, mid.y}, &DOOM, startText, buttonSize, spacing);
+    Vector2 settingsPos = centreText((Vector2){mid.x, screenHeight * 0.75f}, &DOOM, settingsText, buttonSize, spacing);
+    Vector2 exitPos = {10, screenHeight - 10 - exitDimentions.y}; // centers it on only the y cordinate
     
     // Pointer 
-    Vector2 pointerPos = {startPos.x - pointer.width - 10, startPos.y + start.height / 2.0f - pointer.height / 2.0f}; // starts next to start button
+    Vector2 pointerPos = {startPos.x - 10 - pointer.width, startPos.y}; // starts next to start button
 
 
 
 
-    unsigned short selectedButton = 0;
+    unsigned short hoveredButton = 0;
     /*
         start = 0 
         settings = 1
@@ -360,40 +371,48 @@ void StartMenu(const int FRAMERATE, Inputs hotkeys, unsigned short *gameState, i
 
         if (WindowShouldClose()) *gameState = -1; // will set gameState to bit integer limit, used for exit
         if (checkWindowSize(&screenWidth, &screenHeight)) {
-            mid = (Vector2){screenWidth / 2.0f, screenHeight / 2.0f};
 
-            // Center title
-            titlePos = (Vector2){mid.x - title.width * titleSF / 2.0f, screenHeight / 4.0f - title.height * titleSF / 2.0f};
-            titleShadowPos = (Vector2){titlePos.x + 10, titlePos.y + 10};
+            //readjusting size
+            adjustmentFactor = (float)screenHeight / 800.0f; 
+            buttonSize = 36.0f * adjustmentFactor * 2; 
+            titleSize = 2.0f * buttonSize;
+            spacing = buttonSize / 18.0f;
 
-            // Buttons
-            startPos = (Vector2){mid.x - start.width / 2.0f, mid.y - start.height / 2.0f};
-            settingsPos = (Vector2){mid.x - settings.width / 2.0f, screenHeight * 3.0f / 4.0f - settings.height / 2.0f};
-            exitPos = (Vector2){10, screenHeight - exit.height - 10}; // keep exit at bottom left
+
+            mid = (Vector2){screenWidth/2, screenHeight/2};
+
+            titlePos = centreText((Vector2){mid.x, mid.y/4}, &DOOM, titleText, titleSize, spacing);
+            titleShadowPos = (Vector2) {titlePos.x + 5, titlePos.y + 5};
+
+            startPos = centreText((Vector2){mid.x, mid.y}, &DOOM, startText, buttonSize, spacing);
+            settingsPos = centreText((Vector2){mid.x, screenHeight* 0.75f}, &DOOM, settingsText, buttonSize, spacing);
+            // centers exit on only the y co-ordinate
+            exitPos = (Vector2) {10, screenHeight - 10 - exitDimentions.y}; 
         }
         
         // Pointer next to the selected button
-        switch (selectedButton) {
+        switch (hoveredButton) {
             case 0:
-                pointerPos = (Vector2){startPos.x - pointer.width - 10, startPos.y + start.height / 2.0f - pointer.height / 2.0f};
+                pointerPos = (Vector2){startPos.x - pointer.width - 10, startPos.y};
                 break;
             case 1:
-                pointerPos = (Vector2){settingsPos.x - pointer.width - 10, settingsPos.y + settings.height / 2.0f - pointer.height / 2.0f};
+                pointerPos = (Vector2){settingsPos.x - pointer.width - 10, settingsPos.y};
                 break;
             case 2:
-                pointerPos = (Vector2){exitPos.x + exit.width + 10  , exitPos.y + exit.height / 2.0f - pointer.height / 2.0f};
+                pointerPos = (Vector2){exitPos.x + exitDimentions.x + 10, exitPos.y};
                 break;
             default:
+                printf("%s", "Error with pointer selection in start menu");
                 break;
         }
 
         // Inputhandling
 
-        if (getDown(hotkeys) && selectedButton != 2) selectedButton++;
-        if (getUp(hotkeys) && selectedButton != 0) selectedButton--;
+        if (getDown(hotkeys) && hoveredButton != 2) hoveredButton++;
+        if (getUp(hotkeys) && hoveredButton != 0) hoveredButton--;
 
         if (getEnter(hotkeys)) {
-            switch (selectedButton) {
+            switch (hoveredButton) {
                 case 0: *gameState = 2; break; // Start game
                 case 1: *gameState = 1; break; // Settings
                 case 2: *gameState = -1; break; // Exit
@@ -403,53 +422,87 @@ void StartMenu(const int FRAMERATE, Inputs hotkeys, unsigned short *gameState, i
 
     BeginDrawing();
         ClearBackground(WHITE);
-
+        
         // Background
         DrawTexturePro(
             bg, 
             (Rectangle){0, 0, bg.width, bg.height}, 
             (Rectangle){0, 0, screenWidth, screenHeight}, 
-            (Vector2){0, 0}, 0, WHITE);
-
-        // Draw title shadow
-        DrawTexturePro(
-            titleShadow,
-            (Rectangle){0, 0, titleShadow.width, titleShadow.height},
-            (Rectangle){titleShadowPos.x, titleShadowPos.y, titleShadow.width * titleSF, titleShadow.height * titleSF},
-            (Vector2){0, 0}, 0, WHITE);
-        // Draw title
-        DrawTexturePro(
-            title,
-            (Rectangle){0, 0, title.width, title.height},
-            (Rectangle){titlePos.x, titlePos.y, title.width * titleSF, title.height * titleSF},
-            (Vector2){0, 0}, 0, WHITE);
-
-
-        DrawTexture(start, startPos.x, startPos.y, WHITE);
-        DrawTexture(settings, settingsPos.x, settingsPos.y, WHITE);
-        DrawTexture(exit, exitPos.x, exitPos.y, WHITE);
+            (Vector2){0, 0}, 0, WHITE
+        );
+    
+        //pointer
         DrawTexture(pointer, pointerPos.x, pointerPos.y, WHITE);
+
+        // Draw title and shadow
+        DrawTextEx(DOOM, titleText, titleShadowPos, titleSize, spacing, BLUE);
+        DrawTextEx(DOOM, titleText, titlePos, titleSize, spacing, RED);
+
+        //buttons
+        DrawTextEx(DOOM, startText, startPos, buttonSize, spacing, RED);
+        DrawTextEx(DOOM, settingsText, settingsPos, buttonSize, spacing, RED);
+        DrawTextEx(DOOM, exitText, exitPos, buttonSize, spacing, RED);
+
     EndDrawing();
     }
 
     // Cleanup
     UnloadTexture(bg);
-    UnloadTexture(title);
-    UnloadTexture(exit);
-    UnloadTexture(settings);
-    UnloadTexture(start);
     UnloadTexture(pointer);
+    UnloadFont(DOOM);
 }
 
 
 
 
+void settingsMenu(const int FRAMERATE, unsigned short *gameState, int screenWidth, int screenHeight, Inputs *hotkeys){
+    
+    //Initialising Textures
+    const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
+    const Texture2D pointer = LoadTexture("Assets/Menu/pointer.png");
+
+    const Font DOOM = LoadFontEx("Assets/font/Amazdoomleft-epw3.ttf", 128, 0, 0);
+    SetTextureFilter(DOOM.texture, TEXTURE_FILTER_POINT);
+
+    float adjustmentFactor = roundf((float)screenHeight / 800.0f); //scale with screen size. 1 at base size
+
+    float buttonSize = 36.0f * adjustmentFactor * 2;
+    float titleSize = 2.0f * buttonSize;
+    float spacing = buttonSize / 18.0f;
+
+    // Text 
+    const char titeText[] = "Settings";
+    
+    const char hotkeysText[] = "Hotkeys";
+    const char healthText[] = "Health Colour";
+    const char musicText[] = "Music Volume:";
+    const char gameText[] = "Game Sound Volume:";
+    const char menuText[] = "Menu Volume:";
+    const char enemyText[] = "Enemy Difficulty:";
+
+    // Dimentions
+    Vector2 titleDimentions = MeasureTextEx(DOOM, titeText, titleSize, spacing);
+
+    Vector2 hotkeysDimentions = MeasureTextEx(DOOM, hotkeysText, buttonSize, spacing);
+    Vector2 healthDimentions = MeasureTextEx(DOOM, healthText, buttonSize, spacing);
+    Vector2 musicDimentions = MeasureTextEx(DOOM, musicText, buttonSize, spacing);
+    Vector2 gameDimentions = MeasureTextEx(DOOM, gameText, buttonSize, spacing);
+    Vector2 menuDimentions = MeasureTextEx(DOOM, menuText, buttonSize, spacing);
+    Vector2 enemyDimentions = MeasureTextEx(DOOM, enemyText, buttonSize, spacing);
+    
+    // Positions
+    Vector2 titlePos = {20, 20}
+
+
+
+}
+
 
 
 
 int main() {
-    int screenWidth = 1400;
-    int screenHeight = 800;
+    int screenWidth = 1600;
+    int screenHeight = 900;
     const int FRAMERATE = 60;
 
     InitWindow(screenWidth , screenHeight, "Racer");
@@ -473,14 +526,14 @@ int main() {
     while (gameState >= 0 && gameState <= 3) {
         switch (gameState) {
             case 0:
-                StartMenu(FRAMERATE, hotkeys, &gameState, screenWidth, screenHeight);
+                startMenu(FRAMERATE, &gameState, screenWidth, screenHeight, hotkeys);
                 break;
-                
+
             case 1:
                 // settings
 
             case 2:
-                gameloop(FRAMERATE);
+                gameloop(FRAMERATE, &gameState);
                 break;
 
             case 3:
