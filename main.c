@@ -2,15 +2,6 @@
 #include "raylib.h"
 #include "raymath.h"
 
-typedef struct Inputs {
-    int up[2];
-    int left[2];
-    int right[2];
-    int down[2];
-    int enter[2];
-} Inputs;
-
-
 typedef struct Player {
     Vector2 pos; 
     Vector2 velocity; 
@@ -277,6 +268,16 @@ void gameloop(const int FRAMERATE, unsigned short *gameState) {
     const Rectangle MAPSIZE = {10, 10, 200, 200};
     const Rectangle TRACK = {0, 0, 1750, 1750};
 
+    
+    unsigned short gameState = 0;
+    /*
+    0 = Start menu
+    1 = Pause menu
+    2 = Game play
+    3 = loss screen
+    */
+    unsigned short previousState = 0;
+
     float sensitivity = 0.2;
     Camera3D camera = {0};
     camera.position = (Vector3){0, 2 ,0};
@@ -364,10 +365,19 @@ void startMenu(const int FRAMERATE, unsigned short *gameState, int screenWidth, 
         exit = 2
     */
 
+        if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
+        if (IsKeyPressed(KEY_ESCAPE)) {
+            if (gameState == 1) gameState = 2;
+            else if (gameState == 2) gameState = 1;
+        }
 
 
+        switch (gameState) {
+        case 0:
+            /* start menu */
 
-    while(*gameState == 0){
+        case 1:
+            // pause
 
         if (WindowShouldClose()) *gameState = -1; // will set gameState to bit integer limit, used for exit
         if (checkWindowSize(&screenWidth, &screenHeight)) {
@@ -405,6 +415,7 @@ void startMenu(const int FRAMERATE, unsigned short *gameState, int screenWidth, 
                 printf("%s", "Error with pointer selection in start menu");
                 break;
         }
+        
 
         // Inputhandling
 
@@ -505,8 +516,7 @@ int main() {
     int screenHeight = 900;
     const int FRAMERATE = 60;
 
-    InitWindow(screenWidth , screenHeight, "Racer");
-    SetWindowState(FLAG_WINDOW_RESIZABLE); // Draging the corner will resize the window
+    InitWindow(SCREENWIDTH, SCREENHIEGHT, "Racer");
 
     SetTargetFPS(FRAMERATE); // Limit to 60 frames per second
     SetExitKey(KEY_NULL); // Stops pressing esc closing the window
@@ -548,6 +558,7 @@ int main() {
 
 
 
+    gameloop(FRAMERATE);
 
     CloseWindow(); // Clean up
     return 0;
