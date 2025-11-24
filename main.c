@@ -65,8 +65,6 @@ bool getRight(Inputs hotkeys) {
 	return IsKeyPressed(hotkeys.right[0]) || IsKeyPressed(hotkeys.right[1]);
 }
 
-// dif cause enter key must be pressed
-
 bool getEnter(Inputs hotkeys) {
 	return IsKeyPressed(hotkeys.enter[0]) || IsKeyPressed(hotkeys.enter[1]);
 }
@@ -374,7 +372,6 @@ void startMenu(const int FRAMERATE, unsigned short *gameState, const int SCREENW
 	const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
 	const Texture2D pointer = LoadTexture("Assets/Menu/pointer.png");
 
-
 	//text
 	const char titleText[] = "SUPER RACEY RACER";
 	const char startText[] = "Start";
@@ -386,45 +383,54 @@ void startMenu(const int FRAMERATE, unsigned short *gameState, const int SCREENW
 	Scaling with integers leads to smooth edges.
 	Floats are used to avoid realtime casting in the raylib text func*/
 
-	float buttonSize = 36.0f * 2; //Multiplying 36 because I want the resolution to be a clean multi
-	float titleSize = 2.0f * buttonSize;
-	float spacing = buttonSize / 18.0f;
+	float baseButtonSize = 36.0f * 2; //Multiplying 36 because I want the resolution to be a clean multi
+	float baseTitleSize = 2.0f * baseButtonSize;
+	float baseSpacing = baseButtonSize / 18.0f;
 
 	FontData button = {
 		.FONT = &DOOM,
-		.size = buttonSize,
-		.spacing = spacing
+		.size = baseButtonSize,
+		.spacing = baseSpacing
 	};
 
 	FontData title = {
 		.FONT = &DOOM,
-		.size = titleSize,
-		.spacing = spacing
+		.size = baseTitleSize,
+		.spacing = baseSpacing
 	};
 	
 	// Exit needs dimentions because he is reletive to a side
-	Vector2 exitDimentions = MeasureTextEx(DOOM, exitText, buttonSize, spacing);
+	Vector2 baseExitDimentions = MeasureTextEx(DOOM, exitText, baseButtonSize, baseSpacing);
 
 	// Positions
 	Vector2 mid = {SCREENWIDTH/2, SCREENHEIGHT/2};
 
-	Vector2 titlePos = centreText((Vector2){mid.x, mid.y/4}, title, titleText);
-	Vector2 titleShadowPos = {titlePos.x + 5, titlePos.y + 5}; // Offseting shadow
+	Vector2 baseTitlePos = centreText((Vector2){mid.x, mid.y/4}, title, titleText);
+	Vector2 baseTitleShadowPos = {baseTitlePos.x + 5, baseTitlePos.y + 5}; // Offseting shadow
 
 	// Buttons
-	Vector2 startPos = centreText((Vector2){mid.x, mid.y}, button, startText);
-	Vector2 settingsPos = centreText((Vector2){mid.x, SCREENHEIGHT * 0.75f}, button, settingsText);
-	Vector2 exitPos = {10, SCREENHEIGHT - 10 - exitDimentions.y}; // centers it on only the y cordinate
-	
-	// Pointer 
-	Vector2 pointerPos = {startPos.x - 10 - pointer.width, startPos.y}; // starts next to start button
+	Vector2 baseStartPos = centreText((Vector2){mid.x, mid.y}, button, startText);
+	Vector2 baseSettingsPos = centreText((Vector2){mid.x, SCREENHEIGHT * 0.75f}, button, settingsText);
+	Vector2 baseExitPos = {10, SCREENHEIGHT - 10 - baseExitDimentions.y}; // centers it on only the y cordinate
 
+	
+	Vector2 exitDimentions = baseExitDimentions;
+	Vector2 titlePos = baseTitlePos;
+	Vector2 titleShadowPos = baseTitleShadowPos;
+
+	Vector2 startPos = baseStartPos;
+	Vector2 settingsPos = baseSettingsPos;
+	Vector2 exitPos = baseExitPos;
+	
+	int buttonSize = baseButtonSize;
+	int titleSize = baseTitleSize;
+	int spacing = baseSpacing;
+
+	// Pointer
+	Vector2 pointerPos = {startPos.x - 10 - pointer.width, startPos.y}; // starts next to start button
 
 	int curWidth = SCREENWIDTH;
 	int curHeight = SCREENHEIGHT;
-
-	float pastWidth = SCREENWIDTH;
-	float pastHeight = SCREENHEIGHT;
 
 	unsigned short hoveredButton = 0;
 	/*
@@ -440,22 +446,19 @@ void startMenu(const int FRAMERATE, unsigned short *gameState, const int SCREENW
 		if (checkWindowSize(&curWidth, &curHeight)) {
 
 			//readjusting size
-			float scaleX = (float) curWidth / pastWidth;
-			float scaleY = (float) curHeight / pastHeight;
+			float scaleX = (float) curWidth / (float) SCREENWIDTH;
+			float scaleY = (float) curHeight / (float) SCREENHEIGHT;
 
-			pastWidth = curWidth;
-			pastHeight = curHeight;
+			buttonSize = baseButtonSize * scaleY;
+			titleSize = baseTitleSize * scaleY;
+			spacing = baseSpacing * scaleY;
 
-			buttonSize = 36.0f * scaleY * 2; 
-			titleSize = 2.0f * buttonSize;
-			spacing = buttonSize / 18.0f;
-
-			titlePos = ScaleVector2(titlePos, scaleX, scaleY);
-			titleShadowPos = ScaleVector2(titleShadowPos, scaleX, scaleY);
-			startPos = ScaleVector2(startPos, scaleX, scaleY);
-			settingsPos = ScaleVector2(settingsPos, scaleX, scaleY);
-			exitPos = ScaleVector2(exitPos, scaleX, scaleY);
-			exitDimentions = ScaleVector2(exitDimentions, scaleX, scaleY);
+			titlePos = ScaleVector2(baseTitlePos, scaleX, scaleY);
+			titleShadowPos = ScaleVector2(baseTitleShadowPos, scaleX, scaleY);
+			startPos = ScaleVector2(baseStartPos, scaleX, scaleY);
+			settingsPos = ScaleVector2(baseSettingsPos, scaleX, scaleY);
+			exitPos = ScaleVector2(baseExitPos, scaleX, scaleY);
+			exitDimentions = ScaleVector2(baseExitDimentions, scaleX, scaleY);
 		}
 		
 		switch (hoveredButton) {
@@ -574,6 +577,7 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 	Vector2 baseEnemyPos = {baseLeftmargin, baseMenuPos.y + baseButtonSize + baseButtonSpacing};
 	Vector2 baseBackPos = {baseLeftmargin, SCREENHEIGHT - baseButtonSize - 10};
 
+
 	// Values position
 	
 	Vector2 baseMusicValuePos = ValuePos(baseMusicPos, doomFont, musicText);
@@ -612,6 +616,34 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 	&backPos
 	};
 
+	// Position arrays
+
+	Vector2 basePosArray[] = {
+		baseTitlePos,
+		baseHotkeyPos,
+		baseHealthPos,
+		baseMusicPos,
+		baseGamePos,
+		baseMenuPos,
+		baseEnemyPos,
+		baseBackPos,
+	};
+
+	Vector2 *posArray[] = {
+		&titlePos,
+		&hotkeyPos,
+		&healthPos,
+		&musicPos,
+		&gamePos,
+		&menuPos,
+		&enemyPos,
+		&backPos,
+	};
+
+
+	int posArrayLen = sizeof(basePosArray)/sizeof(basePosArray[0]);
+
+
 	int pointerOffset = 10 + pointer.width;
 
 	Vector2 pointerPos;
@@ -621,6 +653,7 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 
 	unsigned short hoveredButton = 0;
 	unsigned short selectedButton = 9;
+	
 	/*
 	Key:
 		hotkey = 0
@@ -650,15 +683,10 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 			doomFont.size = buttonSize;
 			doomFont.spacing = spacing;
 
-			hotkeyPos = (Vector2) {leftmargin, baseTitlePos.y + titleSize + 40};
-			healthPos = (Vector2) {leftmargin, hotkeyPos.y + buttonSize + buttonSpacing};
-			musicPos = (Vector2) {leftmargin, healthPos.y + buttonSize + buttonSpacing};
-			gamePos = (Vector2) {leftmargin, musicPos.y + buttonSize + buttonSpacing};
-			menuPos = (Vector2) {leftmargin, gamePos.y + buttonSize + buttonSpacing};
-			enemyPos = (Vector2) {leftmargin, menuPos.y  + buttonSize + buttonSpacing};
-			backPos = (Vector2) {leftmargin, curHeight - buttonSize - 10};
+			for (int i = 0; i <= posArrayLen -1; i++) {
+				*posArray[i] = ScaleVector2(basePosArray[i], scaleX, scaleY);
+			}
 
-			
 			musicValuePos = ValuePos(musicPos, doomFont, musicText);
 			gameValuePos = ValuePos(gamePos, doomFont, gameText);
 			menuValuePos = ValuePos(menuPos, doomFont, menuText);
