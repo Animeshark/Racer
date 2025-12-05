@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <string.h>
 #include "raylib.h"
 #include "raymath.h"
 
@@ -29,15 +30,6 @@ typedef struct Data {
 	*/
 } Data;
 
-typedef struct Player {
-	Vector2 pos; 
-	Vector2 velocity; 
-	Vector2 direction; // the direction the front wheels are facing
-	float acceleration;
-	float width;
-	float length;
-	float breaking;
-} Player;
 
 typedef struct FontData {
 	const Font *FONT;
@@ -120,6 +112,7 @@ bool checkWindowSize(int *screenWidth, int *screenHeight) {
 
 
 Vector2 centreText(Vector2 aimedPos, FontData font, const char *text) {
+	// Returns the position of the top left corner to align the center of the text with the given position
 	Vector2 dimentions = MeasureTextEx(*font.FONT, text, font.size, font.spacing);
 	return Vector2Subtract(aimedPos, Vector2Scale(dimentions, 0.5f));
 }
@@ -129,236 +122,58 @@ Vector2 ScaleVector2(Vector2 v, float scaleX, float scaleY) {
 }
 
 Vector2 ValuePos(Vector2 lablePos, FontData font, const char *lableText) {
+	// Calculates the position of a value that goes infront of a label in the screen e.g. volume value
 	Vector2 lableDimentions = MeasureTextEx(*font.FONT, lableText, font.size, font.spacing);
 	return (Vector2){lablePos.x + lableDimentions.x + 10, lablePos.y};
 }
+
+Vector2 PointerValuePos(Vector2 lablePos, FontData font, const char *lableText, int pointerWidth) {
+	// Calculates the same as valuePos but with space for a pointer in it
+	Vector2 lableDimentions = MeasureTextEx(*font.FONT, lableText, font.size, font.spacing);
+	return (Vector2){lablePos.x + lableDimentions.x + pointerWidth + 10, lablePos.y};
+}
+
 
 void VolumeToString(char *text, float volume) {
 	int percent = (int)(volume * 100.0f + 0.5f);
 	sprintf(text, "%d", percent);
 }
 
-
-
-
-
-Vector2 rescale(Vector2 point, const Rectangle MAPSIZE, const Rectangle TRACK) {
-	Vector2 result;
-
-	float scaleX = MAPSIZE.width / TRACK.width;
-	float scaleY = MAPSIZE.height / TRACK.height;
-
-	result.x = MAPSIZE.x + (point.x - TRACK.x) * scaleX;
-	result.y = MAPSIZE.y + (point.y - TRACK.y) * scaleY;
-
-	return result;
+void KeyToString(char *text, int key) {
+    switch (key) {
+        case KEY_DOWN:
+            strcpy(text, "Down");
+            break;
+        case KEY_UP:
+            strcpy(text, "Up");
+            break;
+        case KEY_LEFT:
+            strcpy(text, "Left");
+            break;
+        case KEY_RIGHT:
+            strcpy(text, "Right");
+            break;
+        case KEY_SPACE:
+            strcpy(text, "Space");
+            break;
+        case KEY_ENTER:
+            strcpy(text, "Enter");
+            break;
+        default:
+            // Printable ASCII fallback
+            if (key >= 32 && key <= 126) {
+                text[0] = (char)key;
+                text[1] = '\0';
+            } else {
+                strcpy(text, "?");
+            }
+            break;
+    }
 }
 
 
 
 
-void attemptedMovement(Player *player, Vector2 *bufferPos) {
-
-	Vector2 resultantAcceleration = {0, 0};
-	float degrees = 0.0f;
-
-	//Rotation
-	if(IsKeyDown(KEY_A)) degrees -= PI/8;
-	if(IsKeyDown(KEY_D)) degrees += PI/8;
-
-	//Acceleration
-	if(IsKeyDown(KEY_W)) {
-		Vector2 accelerationDirection = Vector2Rotate(player->direction, degrees);
-		resultantAcceleration = Vector2Add(resultantAcceleration, Vector2Scale(accelerationDirection, player->acceleration));
-	}
-	//Breaking
-	else if(IsKeyDown(KEY_S)) {
-		resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->direction, player->breaking));
-	}
-	//Resistanve Force
-	resultantAcceleration = Vector2Subtract(resultantAcceleration, Vector2Scale(player->velocity, 0.125));
-	player->velocity = Vector2Add(player->velocity, resultantAcceleration);
-	if(player->velocity.x != 0 || player->velocity.y != 0){
-		player->direction =  Vector2Normalize(player->velocity);
-		
-	}
-	*bufferPos = Vector2Add(*bufferPos, player->velocity);
-}
-
-
-void movePlayer(Player *player, const Rectangle TRACK) {
-	Vector2 bufferPos = player->pos;
-	attemptedMovement(player, &bufferPos);
-
-
-	Rectangle futurePlayer = {
-		bufferPos.x,
-		bufferPos.y,
-		player->width,
-		player->length
-	};
-
-	bool inBounds =
-		bufferPos.x >= TRACK.x &&
-		bufferPos.x + player->width <= TRACK.x + TRACK.width &&
-		bufferPos.y >= TRACK.y &&
-		bufferPos.y + player->length <= TRACK.y + TRACK.height;
-
-	if (inBounds) player->pos = bufferPos;
-
-
-}
-
-
-
-
-void drawWalls3D(const Rectangle WALLS) {
-	float wallHeight = 50.0f;
-	float wallThickness = 0.2f;
-	float y = wallHeight / 2.0f;
-
-	// Bottom wall
-	DrawCubeV((Vector3){WALLS.x + WALLS.width/2, y, WALLS.y}, 
-			  (Vector3){WALLS.width, wallHeight, wallThickness}, RED);
-
-	// Top wall
-	DrawCubeV((Vector3){WALLS.x + WALLS.width/2, y, WALLS.y + WALLS.height}, 
-			  (Vector3){WALLS.width, wallHeight, wallThickness}, BLUE);
-
-	// Left wall
-	DrawCubeV((Vector3){WALLS.x, y, WALLS.y + WALLS.height/2}, 
-			  (Vector3){wallThickness, wallHeight, WALLS.height}, YELLOW);
-
-	// Right wall
-	DrawCubeV((Vector3){WALLS.x + WALLS.width, y, WALLS.y + WALLS.height/2}, 
-			  (Vector3){wallThickness, wallHeight, WALLS.height}, GREEN);
-}
-
-
-void drawMapPlayer(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
-	// Convert top-left player position to center position in world space
-	Vector2 playerCenter = {
-		player.pos.x + player.width / 2,
-		player.pos.y + player.length / 2
-	};
-
-	// Rescale the center position from world space (TRACK) to minimap (MAPSIZE)
-	Vector2 minimapPos = rescale(playerCenter, MAPSIZE, TRACK);
-
-	// Draw the player as a small circle
-	DrawCircleV(minimapPos, 4, RED);  // Adjust radius as needed
-
-	// Draw the direction vector (e.g., facing forward)
-	Vector2 directionEnd = Vector2Add(minimapPos, Vector2Scale(player.direction, 10));
-	DrawLineEx(minimapPos, directionEnd, 2, RED);
-	
-}
-
-
-void drawMap(const Rectangle ROOM) {
-	Vector2 topLeft = {ROOM.x, ROOM.y};
-	Vector2 topRight = {ROOM.x + ROOM.width, ROOM.y};
-	Vector2 bottomRight = {ROOM.x + ROOM.width, ROOM.y + ROOM.height};
-	Vector2 bottomLeft = {ROOM.x, ROOM.y + ROOM.height};
-
-	// Draw walls with different colors
-	DrawLineEx(topLeft, topRight, 4, RED);        // Top wall
-	DrawLineEx(topRight, bottomRight, 4, GREEN);  // Right wall
-	DrawLineEx(bottomRight, bottomLeft, 4, BLUE); // Bottom wall
-	DrawLineEx(bottomLeft, topLeft, 4, YELLOW);   // Left wall
-}
-
-
-void draw(Player player, const Rectangle MAPSIZE, const Rectangle TRACK) {
-	drawMapPlayer(player, MAPSIZE, TRACK);
-	drawMap(MAPSIZE);
-}
-
-
-
-
-// Tbh completely Ai idk how this function works
-void updateCameraLookOnly(Camera3D *camera, float sensitivity) {
-	Vector2 mouseDelta = GetMouseDelta();
-
-	float yaw = -mouseDelta.x * sensitivity;
-	float pitch = -mouseDelta.y * sensitivity;
-
-	// Clamp vertical look (pitch) to avoid flipping
-	static float totalPitch = 0.0f;
-	totalPitch += pitch;
-	if (totalPitch > 89.0f) { pitch -= totalPitch - 89.0f; totalPitch = 89.0f; }
-	if (totalPitch < -89.0f) { pitch -= totalPitch + 89.0f; totalPitch = -89.0f; }
-
-	// Get current forward vector
-	Vector3 forward = Vector3Subtract(camera->target, camera->position);
-
-	// Apply yaw rotation around the up axis
-	Matrix yawMat = MatrixRotate(camera->up, DEG2RAD * yaw);
-	forward = Vector3Transform(forward, yawMat);
-
-	// Calculate right vector and pitch
-	Vector3 right = Vector3Normalize(Vector3CrossProduct(forward, camera->up));
-	Matrix pitchMat = MatrixRotate(right, DEG2RAD * pitch);
-	forward = Vector3Transform(forward, pitchMat);
-
-	// Update target
-	camera->target = Vector3Add(camera->position, forward);
-}
-
-
-
-
-
-
-void gameloop(const int FRAMERATE, unsigned short *gameState) {
-
-	Player player = {
-		.pos = {800, 800},
-		.direction = {0, -1},
-		.width = 4.0f,
-		.length = 4.0f,
-		.acceleration = 13.4/FRAMERATE,
-		.breaking = 0.5,
-		.velocity = {0, 0}
-	};
-
-
-	
-	const Rectangle MAPSIZE = {10, 10, 200, 200};
-	const Rectangle TRACK = {0, 0, 1750, 1750};
-
-	float sensitivity = 0.2;
-	Camera3D camera = {0};
-	camera.position = (Vector3){0, 2 ,0};
-	camera.target = Vector3Add(camera.position, (Vector3){player.direction.x, 0.0f, player.direction.y});
-	camera.up = (Vector3){0.0f, 1.0f, 0.0f}; // Y is up
-	camera.fovy = 45.0f;                                // Field of view
-	camera.projection = CAMERA_PERSPECTIVE;  
-	
-
-
-	while (*gameState == 2) {
-
-		movePlayer(&player, TRACK);
-		
-		if (WindowShouldClose()) *gameState = -1; // will set gameState to bit integer, used for exit
-		if (IsKeyPressed(KEY_F11)) ToggleFullscreen();
-		if (IsKeyPressed(KEY_ESCAPE)) *gameState = 1;
-
-
-		BeginDrawing();
-		ClearBackground(GRAY);
-	
-		BeginMode3D(camera);  // Begin 3D mode with camera
-			camera.position = (Vector3){player.pos.x, 2, player.pos.y};
-			updateCameraLookOnly(&camera, sensitivity);
-			drawWalls3D(TRACK);
-		EndMode3D();
-		draw(player, MAPSIZE, TRACK);
-		EndDrawing();
-	}
-}
 
 
 
@@ -543,6 +358,12 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		.spacing = baseSpacing
 	};
 
+
+
+
+
+
+
 	// Text 
 	const char titeText[] = "Settings";
 	
@@ -551,38 +372,103 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 	const char musicText[] = "Music Volume:";
 	const char gameText[] = "Game Sound Volume:";
 	const char menuText[] = "Menu Volume:";
-	const char enemyText[] = "Enemy Difficulty:";
+	const char enemyText[] = "Enemy Difficulty";
 	const char backText[] = "Back";
-	
+
+	// Hotkey text
+	const char upText[] = "Up:";
+	const char leftText[] = "Left:";
+	const char rightText[] = "Right:";
+	const char downText[] = "Down:";
+	const char enterText[] = "Enter:";
+
+	// Hotkey values
+	char upValueText1[8];
+	char upValueText2[8];
+	char leftValueText1[8];
+	char leftValueText2[8];
+	char rightValueText1[8];
+	char rightValueText2[8];
+	char downValueText1[8];
+	char downValueText2[8];
+	char enterValueText1[8];
+	char enterValueText2[8];
+
+	KeyToString(upValueText1, hotkeys->up[0]);
+	KeyToString(upValueText2, hotkeys->up[1]);
+	KeyToString(leftValueText1, hotkeys->left[0]);
+	KeyToString(leftValueText2, hotkeys->left[1]);
+	KeyToString(rightValueText1, hotkeys->right[0]);
+	KeyToString(rightValueText2, hotkeys->right[1]);
+	KeyToString(downValueText1, hotkeys->down[0]);
+	KeyToString(downValueText2, hotkeys->down[1]);
+	KeyToString(enterValueText1, hotkeys->enter[0]);
+	KeyToString(enterValueText2, hotkeys->enter[1]);
+
 	// Volumes
 	char musicValueText[5];
 	char gameValueText[5];
-	char menuValueText[8];
+	char menuValueText[5];
 
 	VolumeToString(musicValueText, info->musicVolume);
 	VolumeToString(gameValueText, info->gameVolume);
 	VolumeToString(menuValueText, info->menuVolume);
 	
+
+
+
+
+
+
 	// Base Positions
-	int baseLeftmargin = pointer.width + 20;
+	int leftMargin = pointer.width + 20;
 	int baseButtonSpacing = 20;
 
 	// Persistant images
 	Vector2 baseTitlePos = {40, 40};
-	Vector2 baseHotkeyPos = {baseLeftmargin, baseTitlePos.y + baseTitleSize + 40};
-	Vector2 baseHealthPos = {baseLeftmargin, baseHotkeyPos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseMusicPos = {baseLeftmargin, baseHealthPos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseGamePos = {baseLeftmargin, baseMusicPos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseMenuPos = {baseLeftmargin, baseGamePos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseEnemyPos = {baseLeftmargin, baseMenuPos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseBackPos = {baseLeftmargin, SCREENHEIGHT - baseButtonSize - 10};
+	Vector2 baseHotkeyPos = {leftMargin, baseTitlePos.y + baseTitleSize + 40};
+	Vector2 baseHealthPos = {leftMargin, baseHotkeyPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseMusicPos = {leftMargin, baseHealthPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseGamePos = {leftMargin, baseMusicPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseMenuPos = {leftMargin, baseGamePos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseEnemyPos = {leftMargin, baseMenuPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseBackPos = {leftMargin, SCREENHEIGHT - baseButtonSize - 10};
 
 
-	// Values position
+	int rightMargin = SCREENWIDTH/2 + pointer.width + 20;
+
+	// Hotkey Positions
+	Vector2 baseUpPos = {rightMargin, baseHealthPos.y};
+	Vector2 baseLeftPos = {rightMargin, baseUpPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseRightPos = {rightMargin, baseLeftPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseDownPos = {rightMargin, baseRightPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseEnterPos = {rightMargin, baseDownPos.y + baseButtonSize + baseButtonSpacing};
+
 	
-	Vector2 baseMusicValuePos = ValuePos(baseMusicPos, doomFont, musicText);
-	Vector2 baseGameValuePos = ValuePos(baseGamePos, doomFont, gameText);
-	Vector2 baseMenuValuePos = ValuePos(baseMenuPos, doomFont, menuText);
+	Vector2 upValuePos1 = PointerValuePos(baseUpPos, doomFont, upText, pointer.width);
+	Vector2 upValuePos2 = PointerValuePos(upValuePos1, doomFont, upValueText1, pointer.width);
+
+	Vector2 leftValuePos1 = PointerValuePos(baseLeftPos, doomFont, leftText, pointer.width);
+	Vector2 leftValuePos2 = PointerValuePos(leftValuePos1, doomFont, leftValueText1, pointer.width);
+
+	Vector2 rightValuePos1 = PointerValuePos(baseRightPos, doomFont, rightText, pointer.width);
+	Vector2 rightValuePos2 = PointerValuePos(rightValuePos1, doomFont, rightValueText1, pointer.width);
+
+	Vector2 downValuePos1 = PointerValuePos(baseDownPos, doomFont, downText, pointer.width);
+	Vector2 downValuePos2 = PointerValuePos(downValuePos1, doomFont, downValueText1, pointer.width);
+
+	Vector2 enterValuePos1 = PointerValuePos(baseEnterPos, doomFont, enterText, pointer.width);
+	Vector2 enterValuePos2 = PointerValuePos(enterValuePos1, doomFont, enterValueText1, pointer.width);
+
+	// Volume positions
+	
+	Vector2 musicValuePos = ValuePos(baseMusicPos, doomFont, musicText);
+	Vector2 gameValuePos = ValuePos(baseGamePos, doomFont, gameText);
+	Vector2 menuValuePos = ValuePos(baseMenuPos, doomFont, menuText);
+
+
+
+
 
 	// Dynamic Positions
 
@@ -595,18 +481,26 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 	Vector2 enemyPos = baseEnemyPos;
 	Vector2 backPos = baseBackPos;
 
-	Vector2 musicValuePos = baseMusicValuePos;
-	Vector2 gameValuePos = baseGameValuePos;
-	Vector2 menuValuePos = baseMenuValuePos;
-
 	int buttonSize = baseButtonSize;
 	int titleSize = baseTitleSize;
 	int spacing = baseSpacing;
-	int leftmargin = baseLeftmargin;
 	int buttonSpacing = baseButtonSpacing;
 
+	Vector2 upPos = baseUpPos;
+	Vector2 leftPos = baseLeftPos;
+	Vector2 rightPos = baseRightPos;
+	Vector2 downPos = baseDownPos;
+	Vector2 enterPos = baseEnterPos;
+
+	
+
+
+
+
+
+
 	// Pointer
-	Vector2 *pointerPositions[] = {
+	Vector2 *initialPointerPositions[] = {
 	&hotkeyPos,
 	&healthPos,
 	&musicPos,
@@ -615,6 +509,20 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 	&enemyPos,
 	&backPos
 	};
+
+	
+	// Hotkey pointer
+
+	Vector2 *hotkeyPointerPositions[][3] = {
+		{&hotkeyPos, NULL, NULL},
+		{&upPos, &upValuePos1, &upValuePos2},
+		{&leftPos, &leftValuePos1, &leftValuePos2},
+		{&rightPos, &rightValuePos1, &rightValuePos2},
+		{&downPos, &downValuePos1, &downValuePos2},
+		{&enterPos, &enterValuePos1, &enterValuePos2}
+	};
+
+
 
 	// Position arrays
 
@@ -627,6 +535,11 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		baseMenuPos,
 		baseEnemyPos,
 		baseBackPos,
+		baseUpPos,
+		baseLeftPos,
+		baseRightPos,
+		baseDownPos,
+		baseEnterPos
 	};
 
 	Vector2 *posArray[] = {
@@ -638,11 +551,21 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		&menuPos,
 		&enemyPos,
 		&backPos,
+		&upPos,
+		&leftPos,
+		&rightPos,
+		&downPos,
+		&enterPos
 	};
 
 
-	int posArrayLen = sizeof(basePosArray)/sizeof(basePosArray[0]);
 
+
+
+
+
+
+	int posArrayLen = sizeof(basePosArray)/sizeof(basePosArray[0]);
 
 	int pointerOffset = 10 + pointer.width;
 
@@ -653,7 +576,7 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 
 	unsigned short hoveredButton = 0;
 	unsigned short selectedButton = 9;
-	
+
 	/*
 	Key:
 		hotkey = 0
@@ -667,6 +590,32 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		None = 9
 		when no button is selected it shows 9.
 	*/
+
+	unsigned short hotkeyHoveredButton = 0;
+	unsigned short hotkeySelectedButton = 9;
+	
+	/*
+	Key:
+		hotkey = 0
+		up = 1
+		left = 2
+		right = 3
+		down = 4
+		enter = 5
+
+		None = 9
+	*/
+
+	unsigned short hotkeyValueHoveredButton = 0;
+	unsigned short hotkeyValueSelectedButton = 9;
+
+	/*
+	Key:
+		label = 0
+		value1 = 1
+		value2 = 2
+	*/
+	
 
 	while(*gameState == 2){
 		if (WindowShouldClose()) *gameState = -1;
@@ -687,6 +636,24 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 				*posArray[i] = ScaleVector2(basePosArray[i], scaleX, scaleY);
 			}
 
+			// Hotkeys
+			upValuePos1 = PointerValuePos(upPos, doomFont, upText, pointer.width);
+			upValuePos2 = PointerValuePos(upValuePos1, doomFont, upValueText1, pointer.width);
+
+			leftValuePos1 = PointerValuePos(leftPos, doomFont, leftText, pointer.width);
+			leftValuePos2 = PointerValuePos(leftValuePos1, doomFont, leftValueText1, pointer.width);
+
+			rightValuePos1 = PointerValuePos(rightPos, doomFont, rightText, pointer.width);
+			rightValuePos2 = PointerValuePos(rightValuePos1, doomFont, rightValueText1, pointer.width);
+
+			downValuePos1 = PointerValuePos(downPos, doomFont, downText, pointer.width);
+			downValuePos2 = PointerValuePos(downValuePos1, doomFont, downValueText1, pointer.width);
+
+			enterValuePos1 = PointerValuePos(enterPos, doomFont, enterText, pointer.width);
+			enterValuePos2 = PointerValuePos(enterValuePos1, doomFont, enterValueText1, pointer.width);
+
+
+			// Volumes
 			musicValuePos = ValuePos(musicPos, doomFont, musicText);
 			gameValuePos = ValuePos(gamePos, doomFont, gameText);
 			menuValuePos = ValuePos(menuPos, doomFont, menuText);
@@ -695,13 +662,78 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		switch (selectedButton)
 		{
 		case 9:
-			pointerPos = (Vector2){pointerPositions[hoveredButton]->x - pointerOffset, pointerPositions[hoveredButton]->y};
+			pointerPos = (Vector2){initialPointerPositions[hoveredButton]->x - pointerOffset, initialPointerPositions[hoveredButton]->y};
 
 			if (getDown(*hotkeys) && hoveredButton != 6) hoveredButton++;
 			if (getUp(*hotkeys) && hoveredButton != 0) hoveredButton--;
 
 			if (getEnter(*hotkeys)) selectedButton = hoveredButton;
 			break;
+
+		case 0:
+
+
+			if (hotkeySelectedButton == 0) {
+				hotkeySelectedButton = 9;
+				selectedButton = 9;
+			}
+
+			else if (hotkeySelectedButton == 9) {
+				pointerPos = (Vector2){hotkeyPointerPositions[hotkeyHoveredButton][0]->x - pointerOffset, 
+									hotkeyPointerPositions[hotkeyHoveredButton][0]->y};
+
+				if (getLeft(*hotkeys)) {
+					hotkeyHoveredButton = 0;
+				}
+
+				if (getDown(*hotkeys)) {
+				if (hotkeyHoveredButton < 5 && hotkeyHoveredButton != 0)
+					hotkeyHoveredButton++;
+				}
+
+				if (getUp(*hotkeys)) {
+					if (hotkeyHoveredButton > 1)
+						hotkeyHoveredButton--;
+				}
+
+				if (getRight(*hotkeys)) {
+					if (hotkeyHoveredButton == 0)
+						hotkeyHoveredButton = 1;
+				}
+
+				if (getEnter(*hotkeys)) hotkeySelectedButton = hotkeyHoveredButton;
+			}
+	
+			else {
+
+				pointerPos = (Vector2) {hotkeyPointerPositions[hotkeySelectedButton][hotkeyValueHoveredButton]->x - pointerOffset,
+									hotkeyPointerPositions[hotkeySelectedButton][hotkeyValueHoveredButton]->y};
+
+				if(getLeft(*hotkeys)) {
+					if(hotkeyValueHoveredButton > 0) {
+						hotkeyValueHoveredButton--;
+					}
+				}
+
+				if(getRight(*hotkeys)) {
+					if(hotkeyValueHoveredButton < 2) {
+						hotkeyValueHoveredButton++;
+					}
+				}
+
+				if(getEnter(*hotkeys)) {
+					hotkeyValueSelectedButton = hotkeyValueHoveredButton;
+				}
+
+				if(hotkeyValueSelectedButton == 0) {
+					hotkeyValueSelectedButton = 9;
+					hotkeySelectedButton = 9;
+				}
+				else {
+					
+				}
+			}
+
 		case 1:
 
 
@@ -716,9 +748,10 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 			break;
 		}
 	BeginDrawing();
+
 		ClearBackground(WHITE);
 
-				// Background
+		// Background
 		DrawTexturePro(
 			bg, 
 			(Rectangle){0, 0, bg.width, bg.height}, 
@@ -745,6 +778,44 @@ void settingsMenu(const int FRAMERATE, unsigned short *gameState, const int SCRE
 		DrawTextEx(DOOM, musicValueText, musicValuePos, buttonSize, spacing, RED);
 		DrawTextEx(DOOM, gameValueText, gameValuePos, buttonSize, spacing, RED);
 		DrawTextEx(DOOM, menuValueText, menuValuePos, buttonSize, spacing, RED);
+
+
+	switch (selectedButton)
+		{
+		case 0:
+			// hotkeys
+				DrawTextEx(DOOM, upText, upPos, buttonSize, spacing, RED);
+				DrawTextEx(DOOM, leftText, leftPos, buttonSize, spacing, RED);
+				DrawTextEx(DOOM, rightText, rightPos, buttonSize, spacing, RED);
+				DrawTextEx(DOOM, downText, downPos, buttonSize, spacing, RED);
+				DrawTextEx(DOOM, enterText, enterPos, buttonSize, spacing, RED);
+
+			// Values
+				DrawTextEx(DOOM, upValueText1, upValuePos1, buttonSize, spacing, GREEN);
+				DrawTextEx(DOOM, upValueText2, upValuePos2, buttonSize, spacing, GREEN);
+
+				DrawTextEx(DOOM, leftValueText1, leftValuePos1, buttonSize, spacing, GREEN);
+				DrawTextEx(DOOM, leftValueText2, leftValuePos2, buttonSize, spacing, GREEN);
+
+				DrawTextEx(DOOM, rightValueText1, rightValuePos1, buttonSize, spacing, GREEN);
+				DrawTextEx(DOOM, rightValueText2, rightValuePos2, buttonSize, spacing, GREEN);
+
+				DrawTextEx(DOOM, downValueText1, downValuePos1, buttonSize, spacing, GREEN);
+				DrawTextEx(DOOM, downValueText2, downValuePos2, buttonSize, spacing, GREEN);
+
+				DrawTextEx(DOOM, enterValueText1, enterValuePos1, buttonSize, spacing, GREEN);
+				DrawTextEx(DOOM, enterValueText2, enterValuePos2, buttonSize, spacing, GREEN);
+
+			break;
+
+		case 1:
+
+			break;    
+		default:
+			break;
+		}
+				
+
 
 	EndDrawing();
 	}
@@ -802,7 +873,7 @@ int main() {
 				settingsMenu(FRAMERATE, &gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info);
 
 			case 3:
-				gameloop(FRAMERATE, &gameState);
+				//gameplay
 				break;
 
 			case 4:
