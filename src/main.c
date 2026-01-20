@@ -44,7 +44,7 @@ int main(void)
 				break;
 
 			case 2:
-				gameLoop(&gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info, FRAMERATE);
+				gameLoop(&gameState, SCREENWIDTH, SCREENHEIGHT, hotkeys, &info, FRAMERATE);
 				break;
 
 			default:

@@ -25,6 +25,22 @@ bool getEnter(Inputs hotkeys) {
 }
 
 
+bool getUpHeld(Inputs hotkeys) {
+	return IsKeyDown(hotkeys.up[0]) || IsKeyDown(hotkeys.up[1]);
+}
+
+bool getDownHeld(Inputs hotkeys) {
+	return IsKeyDown(hotkeys.down[0]) || IsKeyDown(hotkeys.down[1]);
+}
+
+bool getLeftHeld(Inputs hotkeys) {
+	return IsKeyDown(hotkeys.left[0]) || IsKeyDown(hotkeys.left[1]);
+}
+
+bool getRightHeld(Inputs hotkeys) {
+	return IsKeyDown(hotkeys.right[0]) || IsKeyDown(hotkeys.right[1]);
+}
+
 bool checkWindowSize(int *screenWidth, int *screenHeight) {
 	// Persistent state across calls
 	static bool isBorderless = false;

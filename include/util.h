@@ -35,6 +35,12 @@ bool getLeft(Inputs hotkeys);
 bool getRight(Inputs hotkeys);
 bool getEnter(Inputs hotkeys);
 
+bool getUpHeld(Inputs hotkeys);
+bool getDownHeld(Inputs hotkeys);
+bool getLeftHeld(Inputs hotkeys);
+bool getRightHeld(Inputs hotkeys);
+
+
 /* -------- Window helpers -------- */
 
 bool checkWindowSize(int *screenWidth, int *screenHeight);
