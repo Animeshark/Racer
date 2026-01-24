@@ -3,6 +3,9 @@
 #include "gamePlay.h"
 #include "util.h"
 #include <stdio.h>
+#include <stdint.h>
+
+
 
 typedef struct Car{
 	Vector2 position;
@@ -17,6 +20,8 @@ typedef struct Car{
 	float maxHealth;
 	float health;
 } Car;
+
+
 
 
 
@@ -104,6 +109,63 @@ void calcMiniMapPositions(Vector2 miniMapPos, float miniMapScreenScale, Vector2 
 	*miniMapPlayerPos = Vector2Add(miniMapPos, Vector2Scale(playerPos, miniMapScreenScale));
 }
 
+float getParallelOffset(int row, const int SCREENHEIGHT, const int CameraDistance){
+	return CameraDistance * (SCREENHEIGHT - row) / (row - SCREENHEIGHT / 2);
+}
+
+
+float getPerpendicularOffset(int column, const int SCREENWIDTH, const int CameraDistance, float parallelOffset){
+	return (1 + parallelOffset / CameraDistance)  * column - SCREENWIDTH / 2 - (parallelOffset * SCREENWIDTH) / (2 * CameraDistance);
+}
+
+Vector2 getMapPixelPos(Vector2 playerPos, Vector2 playerDir, float parallelOffset, float perpendicularOffset){
+	return Vector2Add(Vector2Add(playerPos, Vector2Scale(playerDir, parallelOffset)),
+			Vector2Scale((Vector2) {-playerDir.y, playerDir.x}, perpendicularOffset));
+}
+
+int writePixel(Vector2 screenPixelPos, Vector2 mapPixelPos, float mapScale, const unsigned short MAPSIZE, uint8_t *map, Image *tiles) {
+	// Descaling map pos
+	mapPixelPos = Vector2Scale(mapPixelPos, 1/mapScale);
+	int mapx = (int) mapPixelPos.x;
+	int mapy = (int) mapPixelPos.y;
+
+
+	// Check if mapPos is out of range
+	if (mapPixelPos.x < 0 || mapPixelPos.y < 0 || mapPixelPos.x >= MAPSIZE || mapPixelPos.y >= MAPSIZE) return -1;
+
+	uint8_t tileId = map[mapy * MAPSIZE + mapx];
+
+	int texturex = (int)((mapPixelPos.x - mapx) * tiles[tileId].width);
+	int texturey = (int)((mapPixelPos.y - mapy) * tiles[tileId].height);
+
+
+	Color pixelColour = GetImageColor(tiles[tileId], texturex, texturey);
+	DrawPixel(screenPixelPos.x, screenPixelPos.y, pixelColour);
+	return 1;
+}
+
+void draw3DPerspective(Car *player, const int SCREENWIDTH, const int SCREENHEIGHT, const unsigned short MAPSIZE, uint8_t *map, Image *tiles) {
+	//screen dimentions are for the current frame. Constant as they are not changing in this frame
+	const int CameraDistance = 450;
+	float parallelOffset;
+	float perpendicularOffset;
+	float mapScale = SCREENWIDTH * 10.0f / MAPSIZE;
+	Vector2 mapPixelPos;
+	Vector2 scaledPlayerPos = Vector2Scale(player->position, mapScale);
+
+	for (int row = SCREENHEIGHT/2 + 1; row < SCREENHEIGHT; row++) {
+		// Calculated ofsets are multipliers parallel and perpendicular to player direction
+		parallelOffset = getParallelOffset(row, SCREENHEIGHT, CameraDistance);
+
+		for(int column = 0; column < SCREENWIDTH; column++) {
+			perpendicularOffset = getPerpendicularOffset(column, SCREENWIDTH, CameraDistance, parallelOffset);
+			mapPixelPos = getMapPixelPos(scaledPlayerPos, player->direction, parallelOffset, perpendicularOffset);
+			writePixel((Vector2) {column, row}, mapPixelPos, mapScale, MAPSIZE, map, tiles);
+		}
+	}
+}
+
+
 
 void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs hotkeys, Data *info, const int FRAMERATE) {
 
@@ -132,13 +194,13 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	Texture2D miniMapImage = LoadTexture("Assets/Track/FullTrack.png");
 	// Set baseMiniMapScreenScale lower after 3-D rendering
 	// Multi to the miniMap screenSize
-	float baseMiniMapScreenScale = 5.0f;
+	float baseMiniMapScreenScale = 3.0f;
 	Vector2 BaseMiniMapPos = {5, 5};
 
 	float miniMapScreenScale = baseMiniMapScreenScale;
 	Vector2 miniMapPos = BaseMiniMapPos;
 
-	// Player Rendering
+	// Mini Map Player Rendering
 	Vector2 baseMiniMapPlayerPos = Vector2Add(BaseMiniMapPos, Vector2Scale(player.position, baseMiniMapScreenScale));
 	Vector2 miniMapPlayerPos = baseMiniMapPlayerPos;
 
@@ -153,6 +215,24 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	};
 	
 	int flatScreenElementsLen = sizeof(flatScreenElementsBasePos)/sizeof(flatScreenElementsBasePos[0]);
+
+
+	// 3D rendering
+	FILE *track = fopen("Assets/Track/encodedTrack.ck", "rb");
+
+	uint8_t map[MAPSIZE * MAPSIZE];
+	fread(map, 1, MAPSIZE * MAPSIZE, track);
+
+	Image tiles[TILE_COUNT];
+
+	tiles[0] = LoadImage("Assets/Track/tiles/Black.png");
+	tiles[1] = LoadImage("Assets/Track/tiles/Grass.png");
+	tiles[2] = LoadImage("Assets/Track/tiles/Track.png");
+	tiles[3] = LoadImage("Assets/Track/tiles/Red.png");
+	tiles[4] = LoadImage("Assets/Track/tiles/White.png");
+	tiles[5] = LoadImage("Assets/Track/tiles/Black.png"); // Placeholder for the finish line
+
+
 
 	while (*gameState == 2)
 	{
@@ -173,6 +253,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 
 		calcMiniMapPositions(miniMapPos, miniMapScreenScale, &miniMapPlayerPos, player.position);
 		
+		
 		BeginDrawing();
 
 			ClearBackground(BLACK);
@@ -185,7 +266,10 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			// Make it update on a lower framerate after 3-D image generation
 			DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
 
-			
+			draw3DPerspective(&player, currentScreenWidth, currentScreenHeight, MAPSIZE, map, tiles);
+
+			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
+
 
 
 
