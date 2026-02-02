@@ -24,8 +24,8 @@ int main(void)
 	Data info = {
 		.enemyDifficulty = 1,
 		.gameVolume = 0.5f,
-		.menuVolume = 0.5f,
 		.musicVolume = 0.5f,
+		.fov = 90.0f,
 		.healthbarColour = RED
 	};
 
@@ -40,7 +40,7 @@ int main(void)
 				break;
 
 			case 1:
-				settingsMenu(&gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info);
+				settingsMenu(&gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info, FRAMERATE);
 				break;
 
 			case 2:

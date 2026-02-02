@@ -1,5 +1,6 @@
 #include "util.h"
 #include "raymath.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -202,4 +203,9 @@ Color DifficultyToColour(unsigned short enemyDifficulty){
 	default:
 		return WHITE;
 	}
+}
+
+float FovToDistance(float fov, float SCREENWIDTH) {
+	float cameraDistance = SCREENWIDTH/(2.0f * tanf(fov * DEG2RAD * 0.5f));
+	return cameraDistance;
 }

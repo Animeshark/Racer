@@ -163,7 +163,7 @@ void startMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREE
 }
 
 
-void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs *hotkeys, Data *info){
+void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs *hotkeys, Data *info, const int FRAMERATE){
 	
 	//Initialising Textures
 	const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");
@@ -186,13 +186,13 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 
 
 	// Text 
-	const char titeText[] = "Settings";
+	const char titleText[] = "Settings";
 	
 	const char hotkeyText[] = "Hotkeys";
 	const char healthText[] = "Healthbar Colour:";
 	const char musicText[] = "Music Volume:";
-	const char gameText[] = "Game Sound Volume:";
-	const char menuText[] = "Menu Volume:";
+	const char gameText[] = "Game Volume:";
+	const char fovText[] = "FOV:";
 	const char enemyText[] = "Enemy Difficulty:";
 	const char backText[] = "Back";
 
@@ -242,11 +242,14 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 	// Volumes
 	char musicValueText[5];
 	char gameValueText[5];
-	char menuValueText[5];
 
 	VolumeToString(musicValueText, info->musicVolume);
 	VolumeToString(gameValueText, info->gameVolume);
-	VolumeToString(menuValueText, info->menuVolume);
+	
+	// Fov
+	char fovValueText[12];
+	sprintf(fovValueText, "%.0f", info->fov);
+
 
 	// Enemy difficulty
 	char enemyValueText[9];
@@ -266,8 +269,8 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 	Vector2 baseHealthPos = {leftMargin, baseHotkeyPos.y + baseButtonSize + baseButtonSpacing};
 	Vector2 baseMusicPos = {leftMargin, baseHealthPos.y + baseButtonSize + baseButtonSpacing};
 	Vector2 baseGamePos = {leftMargin, baseMusicPos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseMenuPos = {leftMargin, baseGamePos.y + baseButtonSize + baseButtonSpacing};
-	Vector2 baseEnemyPos = {leftMargin, baseMenuPos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseFovPos = {leftMargin, baseGamePos.y + baseButtonSize + baseButtonSpacing};
+	Vector2 baseEnemyPos = {leftMargin, baseFovPos.y + baseButtonSize + baseButtonSpacing};
 	Vector2 baseBackPos = {leftMargin, SCREENHEIGHT - baseButtonSize - 10};
 
 
@@ -304,7 +307,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 	
 	Vector2 musicValuePos = ValuePos(baseMusicPos, doomFont, musicText);
 	Vector2 gameValuePos = ValuePos(baseGamePos, doomFont, gameText);
-	Vector2 menuValuePos = ValuePos(baseMenuPos, doomFont, menuText);
+	Vector2 fovValuePos = ValuePos(baseFovPos, doomFont, fovText);
 
 	// Enemy difficulty position
 
@@ -319,7 +322,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 	Vector2 healthPos = baseHealthPos;
 	Vector2 musicPos = baseMusicPos;
 	Vector2 gamePos = baseGamePos;
-	Vector2 menuPos = baseMenuPos;
+	Vector2 fovPos = baseFovPos;
 	Vector2 enemyPos = baseEnemyPos;
 	Vector2 backPos = baseBackPos;
 
@@ -342,7 +345,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 	&healthPos,
 	&musicPos,
 	&gamePos,
-	&menuPos,
+	&fovPos,
 	&enemyPos,
 	&backPos
 	};
@@ -367,7 +370,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 		baseHealthPos,
 		baseMusicPos,
 		baseGamePos,
-		baseMenuPos,
+		baseFovPos,
 		baseEnemyPos,
 		baseBackPos,
 		baseUpPos,
@@ -383,7 +386,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 		&healthPos,
 		&musicPos,
 		&gamePos,
-		&menuPos,
+		&fovPos,
 		&enemyPos,
 		&backPos,
 		&upPos,
@@ -457,7 +460,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 			// Volumes
 			musicValuePos = ValuePos(musicPos, doomFont, musicText);
 			gameValuePos = ValuePos(gamePos, doomFont, gameText);
-			menuValuePos = ValuePos(menuPos, doomFont, menuText);
+			fovValuePos = ValuePos(fovPos, doomFont, fovText);
 
 			// Enemy difficulty
 			enemyValuePos = ValuePos(enemyPos, doomFont, enemyText);
@@ -602,14 +605,14 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 			break;
 
 		case 5:
-			if(getUp(*hotkeys) && info->menuVolume <= 1) {
-				info->menuVolume += 0.05f;
-				VolumeToString(menuValueText, info->menuVolume);
+			if(getUpHeld(*hotkeys) && info->fov < 120) {
+				info->fov += 10.0f / FRAMERATE;
+				sprintf(fovValueText, "%.0f", info->fov);
 			}
 
-			if(getDown(*hotkeys) && info->menuVolume > 0) {
-				info->menuVolume -= 0.05f;
-				VolumeToString(menuValueText, info->menuVolume);
+			if(getDownHeld(*hotkeys) && info->fov > 30) {
+				info->fov -= 10.0f / FRAMERATE;
+				sprintf(fovValueText, "%.0f", info->fov);
 			}
 			
 			if(getEnter(*hotkeys)) selectedSetting = 0;
@@ -657,14 +660,14 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 			DrawTexture(pointer, pointerPos.x, pointerPos.y, WHITE);
 
 			// Draw settings title
-			DrawTextEx(DOOM, titeText, titlePos, titleSize, spacing, RED);
+			DrawTextEx(DOOM, titleText, titlePos, titleSize, spacing, RED);
 
 			// Draw setting options
 			DrawTextEx(DOOM, hotkeyText, hotkeyPos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, healthText, healthPos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, musicText, musicPos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, gameText, gamePos, buttonSize, spacing, RED);
-			DrawTextEx(DOOM, menuText, menuPos, buttonSize, spacing, RED);
+			DrawTextEx(DOOM, fovText, fovPos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, enemyText, enemyPos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, backText, backPos, buttonSize, spacing, RED);
 
@@ -674,7 +677,7 @@ void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SC
 
 			DrawTextEx(DOOM, musicValueText, musicValuePos, buttonSize, spacing, RED);
 			DrawTextEx(DOOM, gameValueText, gameValuePos, buttonSize, spacing, RED);
-			DrawTextEx(DOOM, menuValueText, menuValuePos, buttonSize, spacing, RED);
+			DrawTextEx(DOOM, fovValueText, fovValuePos, buttonSize, spacing, RED);
 
 			DrawTextEx(DOOM, enemyValueText, enemyValuePos, buttonSize, spacing, enemyValueTextColour);
 

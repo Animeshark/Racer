@@ -4,6 +4,7 @@
 #include "util.h"
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 
 
@@ -114,53 +115,100 @@ float getParallelOffset(int row, const int SCREENHEIGHT, const int CameraDistanc
 }
 
 
-float getPerpendicularOffset(int column, const int SCREENWIDTH, const int CameraDistance, float parallelOffset){
-	return (1 + parallelOffset / CameraDistance)  * column - SCREENWIDTH / 2 - (parallelOffset * SCREENWIDTH) / (2 * CameraDistance);
-}
-
 Vector2 getMapPixelPos(Vector2 playerPos, Vector2 playerDir, float parallelOffset, float perpendicularOffset){
 	return Vector2Add(Vector2Add(playerPos, Vector2Scale(playerDir, parallelOffset)),
 			Vector2Scale((Vector2) {-playerDir.y, playerDir.x}, perpendicularOffset));
 }
 
-int writePixel(Vector2 screenPixelPos, Vector2 mapPixelPos, float mapScale, const unsigned short MAPSIZE, uint8_t *map, Image *tiles) {
-	// Descaling map pos
-	mapPixelPos = Vector2Scale(mapPixelPos, 1/mapScale);
-	int mapx = (int) mapPixelPos.x;
-	int mapy = (int) mapPixelPos.y;
+static inline void writeMapPixel(
+	Color *frame,
+	int screenWidth,
+	int x,
+	int y,
+	Vector2 mapPixelPos,
+	float mapScale,
+	int MAPSIZE,
+	uint8_t *map,
+	Image *tiles
+){
+	// Convert to map space
+	mapPixelPos = Vector2Scale(mapPixelPos, 1.0f / mapScale);
 
+	int mapx = (int)mapPixelPos.x;
+	int mapy = (int)mapPixelPos.y;
 
-	// Check if mapPos is out of range
-	if (mapPixelPos.x < 0 || mapPixelPos.y < 0 || mapPixelPos.x >= MAPSIZE || mapPixelPos.y >= MAPSIZE) return -1;
+	if (mapx < 0 || mapy < 0 || mapx >= MAPSIZE || mapy >= MAPSIZE)
+		return;
 
 	uint8_t tileId = map[mapy * MAPSIZE + mapx];
+	if (tileId == 0) return;
 
-	int texturex = (int)((mapPixelPos.x - mapx) * tiles[tileId].width);
-	int texturey = (int)((mapPixelPos.y - mapy) * tiles[tileId].height);
+	Image *tile = &tiles[tileId];
 
+	int texturex = (int)((mapPixelPos.x - mapx) * tile->width);
+	int texturey = (int)((mapPixelPos.y - mapy) * tile->height);
 
-	Color pixelColour = GetImageColor(tiles[tileId], texturex, texturey);
-	DrawPixel(screenPixelPos.x, screenPixelPos.y, pixelColour);
-	return 1;
+	// Clamp for safety
+	if (texturex < 0) texturex = 0;
+	if (texturey < 0) texturey = 0;
+	if (texturex >= tile->width)  texturex = tile->width - 1;
+	if (texturey >= tile->height) texturey = tile->height - 1;
+
+	frame[y * screenWidth + x] = GetImageColor(*tile, texturex, texturey);
 }
 
-void draw3DPerspective(Car *player, const int SCREENWIDTH, const int SCREENHEIGHT, const unsigned short MAPSIZE, uint8_t *map, Image *tiles) {
+void draw3DPerspective(
+	Car *player,
+	const int SCREENWIDTH,
+	const int SCREENHEIGHT,
+	const unsigned short MAPSIZE,
+	const int CameraDistance,
+	uint8_t *map,
+	Image *tiles,
+	Color *framePixels) {
 	//screen dimentions are for the current frame. Constant as they are not changing in this frame
-	const int CameraDistance = 450;
 	float parallelOffset;
 	float perpendicularOffset;
-	float mapScale = SCREENWIDTH * 10.0f / MAPSIZE;
-	Vector2 mapPixelPos;
+	float mapScale = SCREENWIDTH * 25.0f / MAPSIZE;
+	
 	Vector2 scaledPlayerPos = Vector2Scale(player->position, mapScale);
+
+	memset(framePixels, 0, SCREENWIDTH * SCREENHEIGHT * sizeof(Color));
+
+	// Precalculated constants for efficientcy
+
+	float a;
+	float b;
 
 	for (int row = SCREENHEIGHT/2 + 1; row < SCREENHEIGHT; row++) {
 		// Calculated ofsets are multipliers parallel and perpendicular to player direction
 		parallelOffset = getParallelOffset(row, SCREENHEIGHT, CameraDistance);
 
-		for(int column = 0; column < SCREENWIDTH; column++) {
-			perpendicularOffset = getPerpendicularOffset(column, SCREENWIDTH, CameraDistance, parallelOffset);
-			mapPixelPos = getMapPixelPos(scaledPlayerPos, player->direction, parallelOffset, perpendicularOffset);
-			writePixel((Vector2) {column, row}, mapPixelPos, mapScale, MAPSIZE, map, tiles);
+		// Precalculated horizontal constants for efficientcy
+		a = 1.0f + parallelOffset / CameraDistance;
+		b = SCREENWIDTH / 2.0f + (parallelOffset * SCREENWIDTH) / (2.0f * CameraDistance);
+
+		for (int column = 0; column < SCREENWIDTH; column++) {
+			perpendicularOffset = a * column - b;
+
+			Vector2 mapPos = getMapPixelPos(
+				scaledPlayerPos,
+				player->direction,
+				parallelOffset,
+				perpendicularOffset
+			);
+
+			writeMapPixel(
+				framePixels,
+				SCREENWIDTH,
+				column,
+				row,
+				mapPos,
+				mapScale,
+				MAPSIZE,
+				map,
+				tiles
+			);
 		}
 	}
 }
@@ -218,6 +266,8 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 
 
 	// 3D rendering
+	const int cameraDistance = (int)FovToDistance(info->fov, (float) SCREENWIDTH);
+
 	FILE *track = fopen("Assets/Track/encodedTrack.ck", "rb");
 
 	uint8_t map[MAPSIZE * MAPSIZE];
@@ -232,6 +282,10 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	tiles[4] = LoadImage("Assets/Track/tiles/White.png");
 	tiles[5] = LoadImage("Assets/Track/tiles/Black.png"); // Placeholder for the finish line
 
+	// Frame buffer 
+	Image frame = GenImageColor(SCREENWIDTH, SCREENHEIGHT, BLACK);
+	Texture2D frameTex = LoadTextureFromImage(frame);
+	Color *framePixels = (Color *)frame.data;
 
 
 	while (*gameState == 2)
@@ -266,7 +320,10 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			// Make it update on a lower framerate after 3-D image generation
 			DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
 
-			draw3DPerspective(&player, currentScreenWidth, currentScreenHeight, MAPSIZE, map, tiles);
+			draw3DPerspective(&player, currentScreenWidth, currentScreenHeight, MAPSIZE, cameraDistance, map, tiles, framePixels);
+			UpdateTexture(frameTex, frame.data);
+			DrawTexture(frameTex, 0, 0, WHITE);
+
 
 			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
 

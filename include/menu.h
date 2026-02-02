@@ -15,7 +15,8 @@ void settingsMenu(
 	const int SCREENWIDTH,
 	const int SCREENHEIGHT,
 	Inputs *hotkeys,
-	Data *info
+	Data *info,
+	const int FRAMERATE
 );
 
 #endif

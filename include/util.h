@@ -6,25 +6,25 @@
 /* -------- Types -------- */
 
 typedef struct Inputs {
-    int up[2];
-    int left[2];
-    int down[2];
-    int right[2];
-    int enter[2];
+	int up[2];
+	int left[2];
+	int down[2];
+	int right[2];
+	int enter[2];
 } Inputs;
 
 typedef struct Data {
-    Color healthbarColour;
-    float musicVolume;
-    float menuVolume;
-    float gameVolume;
-    unsigned short enemyDifficulty;
+	Color healthbarColour;
+	float musicVolume;
+	float gameVolume;
+	float fov;
+	unsigned short enemyDifficulty;
 } Data;
 
 typedef struct FontData {
-    const Font *FONT;
-    float size;
-    float spacing;
+	const Font *FONT;
+	float size;
+	float spacing;
 } FontData;
 
 /* -------- Input helpers -------- */
@@ -59,5 +59,6 @@ void KeyToString(char *text, int key);
 void ColourToString(char *text, Color colour);
 void DifficultyToString(char *text, unsigned short difficulty);
 Color DifficultyToColour(unsigned short enemyDifficulty);
+float FovToDistance(float fov, float SCREENWIDTH);
 
 #endif
