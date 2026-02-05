@@ -2,9 +2,11 @@
 #define GAMEPLAY_H
 
 #include "util.h"
+#include "physics.h"
+#include "render.h"
 
-#define MIN_SPEED 0.003f
 #define TILE_COUNT 5
+
 
 
 void gameLoop(

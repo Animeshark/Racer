@@ -11,7 +11,9 @@ RAYLIB_LIB = libs/lib
 SRC = $(SRC_DIR)/main.c \
 	$(SRC_DIR)/menu.c \
 	$(SRC_DIR)/util.c \
-	$(SRC_DIR)/gameplay.c
+	$(SRC_DIR)/gameplay.c \
+	$(SRC_DIR)/physics.c \
+	$(SRC_DIR)/render.c
 
 OBJ = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC))
 

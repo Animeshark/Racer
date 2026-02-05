@@ -2,26 +2,10 @@
 #include "raymath.h"
 #include "gamePlay.h"
 #include "util.h"
+#include "physics.h"
+#include "render.h"
 #include <stdio.h>
 #include <stdint.h>
-#include <string.h>
-
-
-
-typedef struct Car{
-	Vector2 position;
-	Vector2 velocity;
-	Vector2 acceleration;
-	Vector2 direction;
-	float drivingPower;
-	float brakingMagnitude;
-	float turningMagnitude;
-	float resistanceCoefficient;
-	float mass;
-	float maxHealth;
-	float health;
-} Car;
-
 
 
 
@@ -34,183 +18,8 @@ void DrawPlayerMiniMap(Vector2 dir, Vector2 playerPos, float mapScale) {
 		mapScale * 0.4f, RED);
 }
 
-Vector2 getDrivingForce(Car *player, Inputs hotkeys) {
-	if(getUpHeld(hotkeys)) {
-		float forwardVelocity = Vector2DotProduct(player->direction, player->velocity);
-		forwardVelocity = fmaxf(forwardVelocity, MIN_SPEED);
-		return Vector2Scale(player->direction, player->drivingPower / forwardVelocity);
-	}
-	return (Vector2){0, 0};
-}
-
-float getTurningAngle(Inputs hotkeys, float turning) {
-	// clockwise is positive
-	if(getLeftHeld(hotkeys)) return -turning;
-	if(getRightHeld(hotkeys)) return turning;
-	return 0.0f;
-}
-
-Vector2 getSidewaysResistance(Car *player){
-	//Perpendicular direction
-	Vector2 sidewaysDirection = (Vector2) {player->direction.y, -player->direction.x};
-	// Velocity component perpendicular to the direction of the player
-	Vector2 sidewaysVelocity = Vector2Scale(sidewaysDirection, Vector2DotProduct(sidewaysDirection, player->velocity));
-	return Vector2Scale(sidewaysVelocity, -player->resistanceCoefficient);
-}
-
-Vector2 getBrakeForce(Car *player){
-	if (Vector2LengthSqr(player->velocity) > MIN_SPEED * MIN_SPEED) {
-		return Vector2Scale(Vector2Normalize(player->velocity), -player->brakingMagnitude);
-	}
-	return (Vector2){0, 0};
-}
-
-void movePlayer(Car *player, Inputs hotkeys) {
-
-	player->direction = Vector2Rotate(player->direction, getTurningAngle(hotkeys, player->turningMagnitude));
-	player->direction = Vector2Normalize(player->direction);
-
-
-	bool isBraking = getDownHeld(hotkeys);
-
-	Vector2 drivingForce = getDrivingForce(player, hotkeys);
-
-	Vector2 resistanceForce = Vector2Scale(player->velocity, -player->resistanceCoefficient);
-	Vector2 sidewaysResistance = getSidewaysResistance(player);
-	resistanceForce = Vector2Add(resistanceForce, sidewaysResistance);
-
-	Vector2 brakeForce = {0, 0};
-	brakeForce = getBrakeForce(player);
-
-	if (isBraking) {
-		if(Vector2LengthSqr(drivingForce) == 0) {
-			brakeForce = getBrakeForce(player);
-			player->acceleration = Vector2Scale(Vector2Add(brakeForce, resistanceForce), 1.0f / player->mass);
-		}
-		else {
-			player->health -= 0.1f;
-			player->acceleration = Vector2Scale(resistanceForce, 1.0f / player->mass);
-		}
-	}
-	else {
-		player->acceleration = Vector2Scale(Vector2Add(drivingForce, resistanceForce), 1.0f / player->mass);
-	}
-	
-	player->velocity = Vector2Add(player->velocity, player->acceleration);
-
-	if (Vector2LengthSqr(player->velocity) < MIN_SPEED * MIN_SPEED) {
-		player->velocity = (Vector2){0, 0};
-	}
-
-	player->position = Vector2Add(player->position, player->velocity);
-}
-
-
 void calcMiniMapPositions(Vector2 miniMapPos, float miniMapScreenScale, Vector2 *miniMapPlayerPos, Vector2 playerPos) {
 	*miniMapPlayerPos = Vector2Add(miniMapPos, Vector2Scale(playerPos, miniMapScreenScale));
-}
-
-float getParallelOffset(int row, const int SCREENHEIGHT, const int CameraDistance){
-	return CameraDistance * (SCREENHEIGHT - row) / (row - SCREENHEIGHT / 2);
-}
-
-
-Vector2 getMapPixelPos(Vector2 playerPos, Vector2 playerDir, float parallelOffset, float perpendicularOffset){
-	return Vector2Add(Vector2Add(playerPos, Vector2Scale(playerDir, parallelOffset)),
-			Vector2Scale((Vector2) {-playerDir.y, playerDir.x}, perpendicularOffset));
-}
-
-static inline void writeMapPixel(
-	Color *frame,
-	int screenWidth,
-	int x,
-	int y,
-	Vector2 mapPixelPos,
-	float mapScale,
-	int MAPSIZE,
-	uint8_t *map,
-	Image *tiles
-){
-	// Convert to map space
-	mapPixelPos = Vector2Scale(mapPixelPos, 1.0f / mapScale);
-
-	int mapx = (int)mapPixelPos.x;
-	int mapy = (int)mapPixelPos.y;
-
-	if (mapx < 0 || mapy < 0 || mapx >= MAPSIZE || mapy >= MAPSIZE)
-		return;
-
-	uint8_t tileId = map[mapy * MAPSIZE + mapx];
-	if (tileId == 0) return;
-
-	Image *tile = &tiles[tileId];
-
-	int texturex = (int)((mapPixelPos.x - mapx) * tile->width);
-	int texturey = (int)((mapPixelPos.y - mapy) * tile->height);
-
-	// Clamp for safety
-	if (texturex < 0) texturex = 0;
-	if (texturey < 0) texturey = 0;
-	if (texturex >= tile->width)  texturex = tile->width - 1;
-	if (texturey >= tile->height) texturey = tile->height - 1;
-
-	frame[y * screenWidth + x] = GetImageColor(*tile, texturex, texturey);
-}
-
-void draw3DPerspective(
-	Car *player,
-	const int SCREENWIDTH,
-	const int SCREENHEIGHT,
-	const unsigned short MAPSIZE,
-	const int CameraDistance,
-	uint8_t *map,
-	Image *tiles,
-	Color *framePixels) {
-	//screen dimentions are for the current frame. Constant as they are not changing in this frame
-	float parallelOffset;
-	float perpendicularOffset;
-	float mapScale = SCREENWIDTH * 25.0f / MAPSIZE;
-	
-	Vector2 scaledPlayerPos = Vector2Scale(player->position, mapScale);
-
-	memset(framePixels, 0, SCREENWIDTH * SCREENHEIGHT * sizeof(Color));
-
-	// Precalculated constants for efficientcy
-
-	float a;
-	float b;
-
-	for (int row = SCREENHEIGHT/2 + 1; row < SCREENHEIGHT; row++) {
-		// Calculated ofsets are multipliers parallel and perpendicular to player direction
-		parallelOffset = getParallelOffset(row, SCREENHEIGHT, CameraDistance);
-
-		// Precalculated horizontal constants for efficientcy
-		a = 1.0f + parallelOffset / CameraDistance;
-		b = SCREENWIDTH / 2.0f + (parallelOffset * SCREENWIDTH) / (2.0f * CameraDistance);
-
-		for (int column = 0; column < SCREENWIDTH; column++) {
-			perpendicularOffset = a * column - b;
-
-			Vector2 mapPos = getMapPixelPos(
-				scaledPlayerPos,
-				player->direction,
-				parallelOffset,
-				perpendicularOffset
-			);
-
-			writeMapPixel(
-				framePixels,
-				SCREENWIDTH,
-				column,
-				row,
-				mapPos,
-				mapScale,
-				MAPSIZE,
-				map,
-				tiles
-			);
-		}
-	}
 }
 
 
@@ -232,7 +41,6 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 		.position = {12, 60},
 		.resistanceCoefficient = 0.8f,
 		.turningMagnitude = PI/(8 * FRAMERATE),
-
 		.acceleration = {0, 0},
 		.velocity = {0, 0}
 	};
@@ -242,7 +50,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	Texture2D miniMapImage = LoadTexture("Assets/Track/FullTrack.png");
 	// Set baseMiniMapScreenScale lower after 3-D rendering
 	// Multi to the miniMap screenSize
-	float baseMiniMapScreenScale = 3.0f;
+	float baseMiniMapScreenScale = 2.2f;
 	Vector2 BaseMiniMapPos = {5, 5};
 
 	float miniMapScreenScale = baseMiniMapScreenScale;
@@ -275,7 +83,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 
 	Image tiles[TILE_COUNT];
 
-	tiles[0] = LoadImage("Assets/Track/tiles/Black.png");
+	tiles[0] = LoadImage("Assets/Track/tiles/Water.png");
 	tiles[1] = LoadImage("Assets/Track/tiles/Grass.png");
 	tiles[2] = LoadImage("Assets/Track/tiles/Track.png");
 	tiles[3] = LoadImage("Assets/Track/tiles/Red.png");
@@ -287,6 +95,14 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	Texture2D frameTex = LoadTextureFromImage(frame);
 	Color *framePixels = (Color *)frame.data;
 
+	// Flat gameplay Rendering
+
+	// Sky 
+	Texture2D sky = LoadTexture("Assets/Game/Sky.png");
+	float skyScale = SCREENWIDTH/320;
+
+	// Water
+
 
 	while (*gameState == 2)
 	{
@@ -297,6 +113,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			float scaleY = (float) currentScreenHeight / (float) SCREENHEIGHT;
 
 			miniMapScreenScale = baseMiniMapScreenScale * scaleY;
+			skyScale *= scaleX;
 
 			for (int i = 0; i < flatScreenElementsLen; i++){
 				*flatScreenElementsDynamicPos[i] = Vector2Scale(flatScreenElementsBasePos[i], scaleY);
@@ -312,6 +129,9 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 
 			ClearBackground(BLACK);
 
+			// sky
+			DrawTextureEx(sky, (Vector2){0,0}, 0, skyScale, WHITE);
+
 			// Drawing the map
 			// Raw map texture
 			DrawTextureEx(miniMapImage, miniMapPos, 0, miniMapScreenScale, WHITE);
@@ -320,12 +140,13 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			// Make it update on a lower framerate after 3-D image generation
 			DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
 
-			draw3DPerspective(&player, currentScreenWidth, currentScreenHeight, MAPSIZE, cameraDistance, map, tiles, framePixels);
+			draw3DPerspective(player.position, player.direction, currentScreenWidth, currentScreenHeight, MAPSIZE, cameraDistance, map, tiles, framePixels);
 			UpdateTexture(frameTex, frame.data);
 			DrawTexture(frameTex, 0, 0, WHITE);
 
 
-			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
+
+//			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
 
 
 
