@@ -35,7 +35,6 @@ static inline void writeMapPixel(
 	int mapy = (int)mapPixelPos.y;
 
 	if (mapx < 0 || mapy < 0 || mapx >= MAPSIZE || mapy >= MAPSIZE) {
-		frame[y * screenWidth + x] = WATER_COLOUR;
 		return;
 	}
 
@@ -56,7 +55,7 @@ static inline void writeMapPixel(
 	frame[y * screenWidth + x] = GetImageColor(*tile, texturex, texturey);
 }
 
-void draw3DPerspective(
+void calc3DPerspective(
 	Vector2 playerPos,
 	Vector2 playerDir,
 	const int SCREENWIDTH,

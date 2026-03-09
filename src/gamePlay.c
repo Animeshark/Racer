@@ -9,8 +9,6 @@
 
 
 
-
-
 void DrawPlayerMiniMap(Vector2 dir, Vector2 playerPos, float mapScale) {
 	DrawCircleV(playerPos, mapScale * 1.0f, RED);
 	DrawLineEx(playerPos,
@@ -99,9 +97,12 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 
 	// Sky 
 	Texture2D sky = LoadTexture("Assets/Game/Sky.png");
-	float skyScale = SCREENWIDTH/320;
+	float baseSkyScale = SCREENHEIGHT/120;
+	float skyScale = baseSkyScale;
 
 	// Water
+	Texture2D water = LoadTexture("Assets/Game/Water.png");
+	// same scale as the same dimentions
 
 
 	while (*gameState == 2)
@@ -112,12 +113,14 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			float scaleX = (float) currentScreenWidth / (float) SCREENWIDTH;
 			float scaleY = (float) currentScreenHeight / (float) SCREENHEIGHT;
 
+
 			miniMapScreenScale = baseMiniMapScreenScale * scaleY;
-			skyScale *= scaleX;
+			skyScale = baseSkyScale * scaleX;
 
 			for (int i = 0; i < flatScreenElementsLen; i++){
 				*flatScreenElementsDynamicPos[i] = Vector2Scale(flatScreenElementsBasePos[i], scaleY);
 			}
+
 		}
 
 		movePlayer(&player, hotkeys);
@@ -125,13 +128,18 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 		calcMiniMapPositions(miniMapPos, miniMapScreenScale, &miniMapPlayerPos, player.position);
 		
 		
+		calc3DPerspective(player.position, player.direction, 
+			SCREENWIDTH, SCREENHEIGHT, MAPSIZE, cameraDistance, map, tiles, framePixels);
+
+
 		BeginDrawing();
 
 			ClearBackground(BLACK);
 
 			// sky
 			DrawTextureEx(sky, (Vector2){0,0}, 0, skyScale, WHITE);
-
+			// water
+			DrawTextureEx(water, (Vector2){0,currentScreenHeight/2}, 0, skyScale, WHITE);
 			// Drawing the map
 			// Raw map texture
 			DrawTextureEx(miniMapImage, miniMapPos, 0, miniMapScreenScale, WHITE);
@@ -140,18 +148,22 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			// Make it update on a lower framerate after 3-D image generation
 			DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
 
-			draw3DPerspective(player.position, player.direction, currentScreenWidth, currentScreenHeight, MAPSIZE, cameraDistance, map, tiles, framePixels);
 			UpdateTexture(frameTex, frame.data);
-			DrawTexture(frameTex, 0, 0, WHITE);
-
-
-
+			DrawTexturePro(
+				frameTex,
+				(Rectangle) {0, 0, SCREENWIDTH, SCREENHEIGHT},
+				(Rectangle) {0, 0, currentScreenWidth, currentScreenHeight},
+				(Vector2) {0,0},
+				0,
+				WHITE);
 //			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
-
-
-
-
 		EndDrawing();
 	}
+	UnloadTexture(frameTex);
+	UnloadImage(frame);
+	UnloadTexture(miniMapImage);
+	UnloadTexture(sky);
+	UnloadTexture(water);
+	for(int i = 0; i < TILE_COUNT; i++) UnloadImage(tiles[i]);
 }
 

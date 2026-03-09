@@ -8,8 +8,8 @@ int main(void)
 	const int SCREENHEIGHT = 900;
 	const int FRAMERATE = 60;
 
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 	InitWindow(SCREENWIDTH, SCREENHEIGHT, "Racer");
-	SetWindowState(FLAG_WINDOW_RESIZABLE);
 	SetTargetFPS(FRAMERATE);
 	SetExitKey(KEY_NULL);
 

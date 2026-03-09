@@ -4,10 +4,7 @@
 #include "raylib.h"
 #include <stdint.h>
 
-
-#define WATER_COLOUR (Color){15, 29, 119, 255}
-
-void draw3DPerspective(
+void calc3DPerspective(
 	Vector2 playerPos,
 	Vector2 playerDir,
 	const int SCREENWIDTH,
