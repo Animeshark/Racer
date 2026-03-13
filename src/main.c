@@ -6,7 +6,6 @@ int main(void)
 {
 	const int SCREENWIDTH = 1600;
 	const int SCREENHEIGHT = 900;
-	const int FRAMERATE = 60;
 
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE | FLAG_MSAA_4X_HINT);
 	InitWindow(SCREENWIDTH, SCREENHEIGHT, "Racer");
@@ -40,11 +39,11 @@ int main(void)
 				break;
 
 			case 1:
-				settingsMenu(&gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info, FRAMERATE);
+				settingsMenu(&gameState, SCREENWIDTH, SCREENHEIGHT, &hotkeys, &info);
 				break;
 
 			case 2:
-				gameLoop(&gameState, SCREENWIDTH, SCREENHEIGHT, hotkeys, &info, FRAMERATE);
+				gameLoop(&gameState, SCREENWIDTH, SCREENHEIGHT, hotkeys, &info);
 				break;
 
 			default:

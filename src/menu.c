@@ -163,7 +163,7 @@ void startMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREE
 }
 
 
-void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs *hotkeys, Data *info, const int FRAMERATE){
+void settingsMenu(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs *hotkeys, Data *info){
 	
 	//Initialising Textures
 	const Texture2D bg = LoadTexture("Assets/Menu/Backgrounds/Stary.png");

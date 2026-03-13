@@ -8,14 +8,12 @@
 #define TILE_COUNT 5
 
 
-
 void gameLoop(
 	unsigned short *gameState,
 	const int SCREENWIDTH,
 	const int SCREENHEIGHT,
 	Inputs hotkeys,
-	Data *info,
-	const int FRAMERATE
+	Data *info
 );
 
 

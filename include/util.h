@@ -3,6 +3,10 @@
 
 #include "raylib.h"
 
+
+#define MAP_SIZE 128
+#define FRAMERATE 60
+
 /* -------- Types -------- */
 
 typedef struct Inputs {

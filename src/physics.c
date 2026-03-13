@@ -2,16 +2,40 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "util.h"
+#include <stdio.h>
+
+static int roadDetection(Car *racer, uint8_t *map) {
+	int carx = racer->position.x;
+	int cary = racer->position.y;
+
+	return map[MAP_SIZE * cary + carx];
+}
 
 
+static Vector2 getRoadResistance(Car *racer, uint8_t *map) {
+	uint8_t tileCode = roadDetection(racer, map);
 
-static Vector2 getDrivingForce(Car *player, Inputs hotkeys) {
-	if(getUpHeld(hotkeys)) {
-		float forwardVelocity = Vector2DotProduct(player->direction, player->velocity);
-		forwardVelocity = fmaxf(forwardVelocity, MIN_SPEED);
-		return Vector2Scale(player->direction, player->drivingPower / forwardVelocity);
+	switch (tileCode)
+	{
+	case 1:
+		//Grass
+		return Vector2Scale(racer->velocity, -racer->resistanceCoefficient * 10);
+	case 2:
+		//Road
+		return Vector2Scale(racer->velocity, -racer->resistanceCoefficient);
+	case 3:
+		// hairPin
+		return (Vector2){0, 0};
+	default:
+		return (Vector2){0, 0};
 	}
-	return (Vector2){0, 0};
+}
+
+
+static Vector2 getDrivingForce(Car *racer) {
+	float forwardVelocity = Vector2DotProduct(racer->direction, racer->velocity);
+	forwardVelocity = fmaxf(forwardVelocity, MIN_SPEED);
+	return Vector2Scale(racer->direction, racer->drivingPower / forwardVelocity);
 }
 
 static float getTurningAngle(Inputs hotkeys, float turning) {
@@ -21,58 +45,62 @@ static float getTurningAngle(Inputs hotkeys, float turning) {
 	return 0.0f;
 }
 
-static Vector2 getSidewaysResistance(Car *player){
-	//Perpendicular direction
-	Vector2 sidewaysDirection = (Vector2) {player->direction.y, -player->direction.x};
-	// Velocity component perpendicular to the direction of the player
-	Vector2 sidewaysVelocity = Vector2Scale(sidewaysDirection, Vector2DotProduct(sidewaysDirection, player->velocity));
-	return Vector2Scale(sidewaysVelocity, -player->resistanceCoefficient);
+static Vector2 getSidewaysResistance(Car *racer) {
+	Vector2 sidewaysDirection = (Vector2){racer->direction.y, -racer->direction.x};
+	float sidewaysVelocity = Vector2DotProduct(sidewaysDirection, racer->velocity);
+
+	// Max friction force this frame
+	float maxFriction = racer->frictionCoefficient * racer->mass * G;
+
+	// Clamp to only cancel out actual sideways velocity (times mass), don't overshoot
+	float correctionForce = -sidewaysVelocity * racer->mass;
+	correctionForce = Clamp(correctionForce, -maxFriction, maxFriction);
+
+	return Vector2Scale(sidewaysDirection, correctionForce);
 }
 
-static Vector2 getBrakeForce(Car *player){
-	if (Vector2LengthSqr(player->velocity) > MIN_SPEED * MIN_SPEED) {
-		return Vector2Scale(Vector2Normalize(player->velocity), -player->brakingMagnitude);
+static Vector2 getBrakeForce(Car *racer){
+	if (Vector2LengthSqr(racer->velocity) > MIN_SPEED * MIN_SPEED) {
+		return Vector2Scale(Vector2Normalize(racer->velocity), -racer->brakingMagnitude);
 	}
-	return (Vector2){0, 0};
+	return racer->velocity;
 }
 
-void movePlayer(Car *player, Inputs hotkeys) {
 
-	player->direction = Vector2Rotate(player->direction, getTurningAngle(hotkeys, player->turningMagnitude));
-	player->direction = Vector2Normalize(player->direction);
-
+void movePlayer(Car *player, Inputs hotkeys, uint8_t *map) {
+	// turn player
+	player->direction = Vector2Normalize(
+		Vector2Rotate(player->direction, getTurningAngle(hotkeys, player->turningMagnitude))
+	);
 
 	bool isBraking = getDownHeld(hotkeys);
+	bool isDriving = getUpHeld(hotkeys);
 
-	Vector2 drivingForce = getDrivingForce(player, hotkeys);
+	Vector2 driving = isDriving ? getDrivingForce(player) : (Vector2){0, 0};
+	Vector2 sideways = getSidewaysResistance(player);
+	Vector2 brake = isBraking ? getBrakeForce(player) : (Vector2){0, 0};
+	Vector2 resistance = getRoadResistance(player, map);
+	
 
-	Vector2 resistanceForce = Vector2Scale(player->velocity, -player->resistanceCoefficient);
-	Vector2 sidewaysResistance = getSidewaysResistance(player);
-	resistanceForce = Vector2Add(resistanceForce, sidewaysResistance);
-
-	Vector2 brakeForce = {0, 0};
-	brakeForce = getBrakeForce(player);
+	Vector2 totalForce = Vector2Add(driving, resistance);
+	totalForce = Vector2Add(totalForce, sideways);
 
 	if (isBraking) {
-		if(Vector2LengthSqr(drivingForce) == 0) {
-			brakeForce = getBrakeForce(player);
-			player->acceleration = Vector2Scale(Vector2Add(brakeForce, resistanceForce), 1.0f / player->mass);
+		if (isDriving && player->hurtCooldown < 0) {
+			player->health -= 0.5f;
+			player->hurtCooldown = 0.3f * FRAMERATE;
 		}
-		else {
-			player->health -= 0.1f;
-			player->acceleration = Vector2Scale(resistanceForce, 1.0f / player->mass);
-		}
+		totalForce = Vector2Add(totalForce, brake);
 	}
-	else {
-		player->acceleration = Vector2Scale(Vector2Add(drivingForce, resistanceForce), 1.0f / player->mass);
-	}
-	
+
+	player->acceleration = Vector2Scale(totalForce, 1.0f / player->mass);
 	player->velocity = Vector2Add(player->velocity, player->acceleration);
 
-	if (Vector2LengthSqr(player->velocity) < MIN_SPEED * MIN_SPEED) {
+	if (!isDriving && Vector2LengthSqr(player->velocity) < MIN_SPEED * MIN_SPEED) {
 		player->velocity = (Vector2){0, 0};
 	}
 
 	player->position = Vector2Add(player->position, player->velocity);
+	player->hurtCooldown--;
 }
 

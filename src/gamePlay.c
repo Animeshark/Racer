@@ -22,23 +22,22 @@ void calcMiniMapPositions(Vector2 miniMapPos, float miniMapScreenScale, Vector2 
 
 
 
-void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs hotkeys, Data *info, const int FRAMERATE) {
+void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs hotkeys, Data *info) {
 
 	int currentScreenHeight = SCREENHEIGHT;
 	int currentScreenWidth = SCREENWIDTH;
 
-	const unsigned short MAPSIZE = 128;
-
 	Car player = {
-		.brakingMagnitude = 0.1f,
+		.brakingMagnitude = 1.25f,
 		.direction = {0, -1},
-		.drivingPower = 0.01f,
+		.drivingPower = 0.015f,
 		.health = 100,
 		.maxHealth = 100,
 		.mass = 500,
 		.position = {12, 60},
 		.resistanceCoefficient = 0.8f,
-		.turningMagnitude = PI/(8 * FRAMERATE),
+		.frictionCoefficient = 0.5,
+		.turningMagnitude = PI/(4 * FRAMERATE),
 		.acceleration = {0, 0},
 		.velocity = {0, 0}
 	};
@@ -48,7 +47,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	Texture2D miniMapImage = LoadTexture("Assets/Track/FullTrack.png");
 	// Set baseMiniMapScreenScale lower after 3-D rendering
 	// Multi to the miniMap screenSize
-	float baseMiniMapScreenScale = 2.2f;
+	float baseMiniMapScreenScale = 2.0f;
 	Vector2 BaseMiniMapPos = {5, 5};
 
 	float miniMapScreenScale = baseMiniMapScreenScale;
@@ -59,34 +58,39 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	Vector2 miniMapPlayerPos = baseMiniMapPlayerPos;
 
 	Vector2 flatScreenElementsBasePos[] = {
-		miniMapPos,
-		miniMapPlayerPos
+		miniMapPos
 	};
 
-	Vector2 *flatScreenElementsDynamicPos[] = {
-		&miniMapPos,
-		&miniMapPlayerPos
-	};
-	
+	Vector2 *flatScreenElementsDynamicPos[1];
+	flatScreenElementsDynamicPos[0] = &miniMapPos;
+
 	int flatScreenElementsLen = sizeof(flatScreenElementsBasePos)/sizeof(flatScreenElementsBasePos[0]);
 
 
 	// 3D rendering
 	const int cameraDistance = (int)FovToDistance(info->fov, (float) SCREENWIDTH);
 
+	// 1. Check the file opened successfully
 	FILE *track = fopen("Assets/Track/encodedTrack.ck", "rb");
+	if (track == NULL) {
+		printf("ERROR: Failed to open track file!\n");
+		fflush(stdout);
+		*gameState = -1;
+		return;
+	}
 
-	uint8_t map[MAPSIZE * MAPSIZE];
-	fread(map, 1, MAPSIZE * MAPSIZE, track);
+	// 2. Move map off the stack — make it static or malloc it
+	static uint8_t map[MAP_SIZE * MAP_SIZE];
+	fread(map, 1, MAP_SIZE * MAP_SIZE, track);
+	fclose(track);  // you're also never closing this file
 
 	Image tiles[TILE_COUNT];
 
-	tiles[0] = LoadImage("Assets/Track/tiles/Water.png");
+	tiles[0] = LoadImage("Assets/Track/tiles/Black.png");
 	tiles[1] = LoadImage("Assets/Track/tiles/Grass.png");
 	tiles[2] = LoadImage("Assets/Track/tiles/Track.png");
-	tiles[3] = LoadImage("Assets/Track/tiles/Red.png");
-	tiles[4] = LoadImage("Assets/Track/tiles/White.png");
-	tiles[5] = LoadImage("Assets/Track/tiles/Black.png"); // Placeholder for the finish line
+	tiles[3] = LoadImage("Assets/Track/tiles/HairPin.png");
+	tiles[4] = LoadImage("Assets/Track/tiles/Finish.png"); // Placeholder for the finish line
 
 	// Frame buffer 
 	Image frame = GenImageColor(SCREENWIDTH, SCREENHEIGHT, BLACK);
@@ -117,19 +121,19 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			miniMapScreenScale = baseMiniMapScreenScale * scaleY;
 			skyScale = baseSkyScale * scaleX;
 
-			for (int i = 0; i < flatScreenElementsLen; i++){
+			for (int i = 0; i <= flatScreenElementsLen - 1; i++){
 				*flatScreenElementsDynamicPos[i] = Vector2Scale(flatScreenElementsBasePos[i], scaleY);
 			}
-
 		}
 
-		movePlayer(&player, hotkeys);
+		
+		movePlayer(&player, hotkeys, map);
 
 		calcMiniMapPositions(miniMapPos, miniMapScreenScale, &miniMapPlayerPos, player.position);
 		
 		
 		calc3DPerspective(player.position, player.direction, 
-			SCREENWIDTH, SCREENHEIGHT, MAPSIZE, cameraDistance, map, tiles, framePixels);
+			SCREENWIDTH, SCREENHEIGHT, cameraDistance, map, tiles, framePixels);
 
 
 		BeginDrawing();
@@ -156,7 +160,7 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 				(Vector2) {0,0},
 				0,
 				WHITE);
-//			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
+			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
 		EndDrawing();
 	}
 	UnloadTexture(frameTex);

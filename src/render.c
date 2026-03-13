@@ -24,7 +24,6 @@ static inline void writeMapPixel(
 	int y,
 	Vector2 mapPixelPos,
 	float mapScale,
-	int MAPSIZE,
 	uint8_t *map,
 	Image *tiles
 ){
@@ -34,11 +33,11 @@ static inline void writeMapPixel(
 	int mapx = (int)mapPixelPos.x;
 	int mapy = (int)mapPixelPos.y;
 
-	if (mapx < 0 || mapy < 0 || mapx >= MAPSIZE || mapy >= MAPSIZE) {
+	if (mapx < 0 || mapy < 0 || mapx >= MAP_SIZE || mapy >= MAP_SIZE) {
 		return;
 	}
 
-	uint8_t tileId = map[mapy * MAPSIZE + mapx];
+	uint8_t tileId = map[mapy * MAP_SIZE + mapx];
 	if (tileId == 0) return;
 
 	Image *tile = &tiles[tileId];
@@ -60,7 +59,6 @@ void calc3DPerspective(
 	Vector2 playerDir,
 	const int SCREENWIDTH,
 	const int SCREENHEIGHT,
-	const unsigned short MAPSIZE,
 	const int CameraDistance,
 	uint8_t *map,
 	Image *tiles,
@@ -68,7 +66,7 @@ void calc3DPerspective(
 	//screen dimentions are for the current frame. Constant as they are not changing in this frame
 	float parallelOffset;
 	float perpendicularOffset;
-	float mapScale = SCREENWIDTH * 50.0f / MAPSIZE;
+	float mapScale = SCREENWIDTH * 50.0f / MAP_SIZE;
 	
 	Vector2 scaledPlayerPos = Vector2Scale(playerPos, mapScale);
 
@@ -104,7 +102,6 @@ void calc3DPerspective(
 				row,
 				mapPos,
 				mapScale,
-				MAPSIZE,
 				map,
 				tiles
 			);
