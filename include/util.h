@@ -5,7 +5,7 @@
 
 
 #define MAP_SIZE 128
-#define FRAMERATE 60
+#define FRAMERATE 30
 
 /* -------- Types -------- */
 

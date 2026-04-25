@@ -4,6 +4,7 @@
 #include "util.h"
 #include "physics.h"
 #include "render.h"
+#include "pauseMenu.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -24,23 +25,48 @@ void calcMiniMapPositions(Vector2 miniMapPos, float miniMapScreenScale, Vector2 
 
 void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREENHEIGHT, Inputs hotkeys, Data *info) {
 
-	int currentScreenHeight = SCREENHEIGHT;
-	int currentScreenWidth = SCREENWIDTH;
-
 	Car player = {
-		.brakingMagnitude = 1.25f,
+		.brakingMagnitude = 2.0f,
 		.direction = {0, -1},
-		.drivingPower = 0.015f,
+		.drivingPower = 0.25f,
 		.health = 100,
 		.maxHealth = 100,
-		.mass = 500,
+		.mass = 400,
 		.position = {12, 60},
 		.resistanceCoefficient = 0.8f,
-		.frictionCoefficient = 0.5,
-		.turningMagnitude = PI/(4 * FRAMERATE),
+		.frictionCoefficient = 0.6f,
+		.turningMagnitude = PI/(3.14f * FRAMERATE),
 		.acceleration = {0, 0},
 		.velocity = {0, 0}
 	};
+
+	int currentScreenHeight = SCREENHEIGHT;
+	int currentScreenWidth = SCREENWIDTH;
+
+	
+	Font DOOM = LoadFontEx("Assets/font/Amazdoomleft-epw3.ttf", 128, 0, 0);
+
+	unsigned short gameStateTwo = 0;
+
+	// Initialising start timer
+	unsigned int timerLenght = 6 * FRAMERATE;
+
+	// Timer values
+	bool needTimer = true;
+	char timerText[8];
+	sprintf(timerText, "%d", timerLenght / FRAMERATE);
+
+	float timerSize = 80;
+	float timerSpacing = 6;
+
+	FontData doomFont = {
+		.FONT = &DOOM,
+		.size = timerSize,
+		.spacing = timerSpacing
+	};
+
+	Vector2 baseTimerPos = centreText((Vector2){currentScreenWidth/2, currentScreenHeight/2}, doomFont, timerText);
+	Vector2 timerPos = baseTimerPos;
 
 
 	// Mini Map Rendering
@@ -48,21 +74,24 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	// Set baseMiniMapScreenScale lower after 3-D rendering
 	// Multi to the miniMap screenSize
 	float baseMiniMapScreenScale = 2.0f;
-	Vector2 BaseMiniMapPos = {5, 5};
+	Vector2 baseMiniMapPos = {5, 5};
 
 	float miniMapScreenScale = baseMiniMapScreenScale;
-	Vector2 miniMapPos = BaseMiniMapPos;
+	Vector2 miniMapPos = baseMiniMapPos;
 
 	// Mini Map Player Rendering
-	Vector2 baseMiniMapPlayerPos = Vector2Add(BaseMiniMapPos, Vector2Scale(player.position, baseMiniMapScreenScale));
+	Vector2 baseMiniMapPlayerPos = Vector2Add(baseMiniMapPos, Vector2Scale(player.position, baseMiniMapScreenScale));
 	Vector2 miniMapPlayerPos = baseMiniMapPlayerPos;
 
 	Vector2 flatScreenElementsBasePos[] = {
-		miniMapPos
+		baseMiniMapPos,
+		baseTimerPos
 	};
 
-	Vector2 *flatScreenElementsDynamicPos[1];
-	flatScreenElementsDynamicPos[0] = &miniMapPos;
+	Vector2 *flatScreenElementsDynamicPos[] = {
+		&miniMapPos,
+		&timerPos
+	};
 
 	int flatScreenElementsLen = sizeof(flatScreenElementsBasePos)/sizeof(flatScreenElementsBasePos[0]);
 
@@ -126,42 +155,59 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 			}
 		}
 
-		
-		movePlayer(&player, hotkeys, map);
+		if (getEnter(hotkeys)) gameStateTwo = 1;
 
-		calcMiniMapPositions(miniMapPos, miniMapScreenScale, &miniMapPlayerPos, player.position);
-		
-		
-		calc3DPerspective(player.position, player.direction, 
-			SCREENWIDTH, SCREENHEIGHT, cameraDistance, map, tiles, framePixels);
+		if (gameStateTwo == 0){
+			if (needTimer) {
+				timerLenght--;
+				sprintf(timerText, "%d", timerLenght / FRAMERATE);
+				if (timerLenght / FRAMERATE <= 0) needTimer = false;
+				
+			} else {
+				movePlayer(&player, hotkeys, map);
+				calcMiniMapPositions(miniMapPos, miniMapScreenScale, &miniMapPlayerPos, player.position);
+			}
+			
+			calc3DPerspective(player.position, player.direction, 
+				SCREENWIDTH, SCREENHEIGHT, cameraDistance, map, tiles, framePixels);
 
 
-		BeginDrawing();
+			BeginDrawing();
 
-			ClearBackground(BLACK);
+				ClearBackground(BLACK);
 
-			// sky
-			DrawTextureEx(sky, (Vector2){0,0}, 0, skyScale, WHITE);
-			// water
-			DrawTextureEx(water, (Vector2){0,currentScreenHeight/2}, 0, skyScale, WHITE);
-			// Drawing the map
-			// Raw map texture
-			DrawTextureEx(miniMapImage, miniMapPos, 0, miniMapScreenScale, WHITE);
+				// sky
+				DrawTextureEx(sky, (Vector2){0,0}, 0, skyScale, WHITE);
+				// water
+				DrawTextureEx(water, (Vector2){0,currentScreenHeight/2}, 0, skyScale, WHITE);
+				// Drawing the map
+				// Raw map texture
+				DrawTextureEx(miniMapImage, miniMapPos, 0, miniMapScreenScale, WHITE);
 
-			// Drawing the miniMap player[]
-			// Make it update on a lower framerate after 3-D image generation
-			DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
+				// Drawing the miniMap player
+				// Make it update on a lower framerate after 3-D image generation
+				DrawPlayerMiniMap(player.direction, miniMapPlayerPos, miniMapScreenScale);
 
-			UpdateTexture(frameTex, frame.data);
-			DrawTexturePro(
-				frameTex,
-				(Rectangle) {0, 0, SCREENWIDTH, SCREENHEIGHT},
-				(Rectangle) {0, 0, currentScreenWidth, currentScreenHeight},
-				(Vector2) {0,0},
-				0,
-				WHITE);
-			DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
-		EndDrawing();
+				UpdateTexture(frameTex, frame.data);
+				DrawTexturePro(
+					frameTex,
+					(Rectangle) {0, 0, SCREENWIDTH, SCREENHEIGHT},
+					(Rectangle) {0, 0, currentScreenWidth, currentScreenHeight},
+					(Vector2) {0,0},
+					0,
+					WHITE);
+
+				if (needTimer) DrawTextEx(DOOM, timerText, timerPos, timerSize, timerSpacing, WHITE);
+
+				DrawText(TextFormat("FPS: %d", GetFPS()), 10, 10, 20, GREEN);
+			EndDrawing();
+		}
+		else if(gameStateTwo == 1){
+			// Pause menu
+			pauseMenu(gameState, &gameStateTwo, SCREENWIDTH, SCREENHEIGHT, hotkeys, info, &DOOM);
+			needTimer = true;
+			timerLenght = 4 * FRAMERATE;
+		};
 	}
 	UnloadTexture(frameTex);
 	UnloadImage(frame);
@@ -169,5 +215,5 @@ void gameLoop(unsigned short *gameState, const int SCREENWIDTH, const int SCREEN
 	UnloadTexture(sky);
 	UnloadTexture(water);
 	for(int i = 0; i < TILE_COUNT; i++) UnloadImage(tiles[i]);
-}
+ }
 

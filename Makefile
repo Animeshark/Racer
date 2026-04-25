@@ -9,11 +9,14 @@ RAYLIB_INC = libs/include
 RAYLIB_LIB = libs/lib
 
 SRC = $(SRC_DIR)/main.c \
-	$(SRC_DIR)/menu.c \
+	$(SRC_DIR)/settingsMenu.c \
+	$(SRC_DIR)/startMenu.c \
 	$(SRC_DIR)/util.c \
 	$(SRC_DIR)/gameplay.c \
 	$(SRC_DIR)/physics.c \
-	$(SRC_DIR)/render.c
+	$(SRC_DIR)/render.c \
+	$(SRC_DIR)/pauseMenu.c \
+	$(SRC_DIR)/carMenu.c
 
 OBJ = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRC))
 

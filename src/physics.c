@@ -66,7 +66,6 @@ static Vector2 getBrakeForce(Car *racer){
 	return racer->velocity;
 }
 
-
 void movePlayer(Car *player, Inputs hotkeys, uint8_t *map) {
 	// turn player
 	player->direction = Vector2Normalize(

@@ -1,9 +1,11 @@
 #include "raylib.h"
-#include "menu.h"
+#include "settingsMenu.h"
+#include "startMenu.h"
 #include "gamePlay.h"
+#include "carMenu.h"
 
-int main(void)
-{
+int main(void){
+
 	const int SCREENWIDTH = 1600;
 	const int SCREENHEIGHT = 900;
 
@@ -28,9 +30,11 @@ int main(void)
 		.healthbarColour = RED
 	};
 
+
+
 	unsigned short gameState = 0;
 
-	while (gameState <= 3)
+	while (gameState <= 9)
 	{
 		switch (gameState)
 		{
@@ -44,6 +48,15 @@ int main(void)
 
 			case 2:
 				gameLoop(&gameState, SCREENWIDTH, SCREENHEIGHT, hotkeys, &info);
+				break;
+/*
+			case 3:
+				carMenu(&gameState, SCREENWIDTH, SCREENHEIGHT, hotkeys, &info, &player);
+				break;
+*/				
+
+			case 9:
+				gameState = 2;
 				break;
 
 			default:

@@ -28,8 +28,22 @@ typedef struct Car{
 } Car;
 
 
+typedef struct Npc
+{
+	Car racecar;
+	bool up;
+	bool left;
+	bool right;
+	bool down;
+	Vector2 target;
+	// between 1 and 100
+	int aggressiveness;
+	int saftey;
+	
+	int inputCountdown;
+} Npc;
 
 void movePlayer(Car *player, Inputs hotkeys, uint8_t *map);
 
-
+void moveNpc(Npc *racer, uint8_t *map);
 #endif

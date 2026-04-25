@@ -6,7 +6,7 @@ OUTPUT_DIR = "Assets/Track"
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-img = Image.open("Assets/Track/FullTrack.png").convert("RGB")
+img = Image.open("Assets/Track/FullTrack.png").convert("RGB")	
 width, height = img.size
 pixels = img.load()
 
